@@ -27,27 +27,29 @@ void gemm_parallel(const Tensor& A, const Tensor& B, Tensor& C, size_t block_siz
     const float* b = B.data();
     float* c = C.data();
 
-    // Parallelize over output tile grid (ii, jj).
-    // Each thread owns distinct output regions, so no race conditions.
-    // The kk loop is inside (reduction), so partial sums accumulate correctly
-    // without atomics.
-    #pragma omp parallel for collapse(2) schedule(static)
-    for (size_t ii = 0; ii < M; ii += block_size) {
-        for (size_t jj = 0; jj < N; jj += block_size) {
-            const size_t i_end = std::min(ii + block_size, M);
-            const size_t j_end = std::min(jj + block_size, N);
+    // Linearize the 2D tile grid into a single loop for MSVC compatibility.
+    // MSVC's OpenMP doesn't support collapse() and requires signed loop vars.
+    const int tile_rows = static_cast<int>((M + block_size - 1) / block_size);
+    const int tile_cols = static_cast<int>((N + block_size - 1) / block_size);
+    const int num_tiles = tile_rows * tile_cols;
 
-            for (size_t kk = 0; kk < K; kk += block_size) {
-                const size_t k_end = std::min(kk + block_size, K);
+    #pragma omp parallel for schedule(static)
+    for (int tile_idx = 0; tile_idx < num_tiles; ++tile_idx) {
+        const size_t ii = static_cast<size_t>(tile_idx / tile_cols) * block_size;
+        const size_t jj = static_cast<size_t>(tile_idx % tile_cols) * block_size;
+        const size_t i_end = std::min(ii + block_size, M);
+        const size_t j_end = std::min(jj + block_size, N);
 
-                for (size_t i = ii; i < i_end; ++i) {
-                    for (size_t j = jj; j < j_end; ++j) {
-                        float sum = 0.0f;
-                        for (size_t k = kk; k < k_end; ++k) {
-                            sum += a[i * K + k] * b[k * N + j];
-                        }
-                        c[i * N + j] += sum;
+        for (size_t kk = 0; kk < K; kk += block_size) {
+            const size_t k_end = std::min(kk + block_size, K);
+
+            for (size_t i = ii; i < i_end; ++i) {
+                for (size_t j = jj; j < j_end; ++j) {
+                    float sum = 0.0f;
+                    for (size_t k = kk; k < k_end; ++k) {
+                        sum += a[i * K + k] * b[k * N + j];
                     }
+                    c[i * N + j] += sum;
                 }
             }
         }
