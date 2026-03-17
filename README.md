@@ -11,6 +11,8 @@ Inspired by how ML accelerator runtimes (Graphcore Poplibs, XLA) schedule comput
   parallel  bs=16  t=20       119.22 ms     18.01 GFLOPS    45.8x
 ```
 
+[View interactive performance chart](docs/gemm_performance_comparison.html)
+
 ---
 
 ## Features

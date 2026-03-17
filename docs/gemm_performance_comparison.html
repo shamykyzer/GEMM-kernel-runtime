@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GEMM Performance Comparison — ml-kernel-runtime</title>
+  <style>
+    :root {
+      --color-background: #1a1a1a;
+      --color-background-secondary: #2a2a2a;
+      --color-text: #c2c0b6;
+      --color-text-secondary: #888;
+      --color-text-danger: #e05252;
+      --color-text-warning: #d4901f;
+      --color-text-success: #1fba89;
+      --border-radius-md: 8px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --color-background: #f5f5f5;
+        --color-background-secondary: #e8e8e8;
+        --color-text: #3d3d3a;
+        --color-text-secondary: #666;
+        --color-text-danger: #c0392b;
+        --color-text-warning: #b7770d;
+        --color-text-success: #1a8a62;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--color-background);
+      color: var(--color-text);
+      margin: 0;
+      padding: 2rem;
+      max-width: 720px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 1.25rem;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      margin: -0.75rem 0 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h2>GEMM Performance Comparison</h2>
+  <p class="subtitle">N=1024 square matrix — naive vs tiled vs parallel (20 threads)</p>
+
+  <div style="padding: 1rem 0;">
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 1.5rem;">
+      <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; text-align: center;">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 4px;">Naive</p>
+        <p style="font-size: 22px; font-weight: 500; margin: 0; color: var(--color-text-danger);">5,454 ms</p>
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 4px 0 0;">0.39 GFLOPS</p>
+      </div>
+      <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; text-align: center;">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 4px;">Tiled (bs=16)</p>
+        <p style="font-size: 22px; font-weight: 500; margin: 0; color: var(--color-text-warning);">646 ms</p>
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 4px 0 0;">3.32 GFLOPS — 8.4x</p>
+      </div>
+      <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; text-align: center;">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 4px;">Parallel (bs=16, 20 threads)</p>
+        <p style="font-size: 22px; font-weight: 500; margin: 0; color: var(--color-text-success);">119 ms</p>
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 4px 0 0;">18.01 GFLOPS — 45.8x</p>
+      </div>
+    </div>
+
+    <div style="position: relative; width: 100%; height: 260px;">
+      <canvas id="perfChart"></canvas>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--color-text-secondary);">
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #A32D2D;"></span>Naive — 0.39 GFLOPS</span>
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #BA7517;"></span>Tiled — 3.32 GFLOPS</span>
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1D9E75;"></span>Parallel — 18.01 GFLOPS</span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script>
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const textColor = isDark ? '#c2c0b6' : '#3d3d3a';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+
+    new Chart(document.getElementById('perfChart'), {
+      type: 'bar',
+      data: {
+        labels: ['Naive', 'Tiled (bs=16)', 'Parallel (20t)'],
+        datasets: [{
+          data: [0.39, 3.32, 18.01],
+          backgroundColor: ['#A32D2D', '#BA7517', '#1D9E75'],
+          borderRadius: 6,
+          barPercentage: 0.6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => c.raw + ' GFLOPS' } }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'GFLOPS (higher = faster)', color: textColor, font: { size: 12 } },
+            grid: { color: gridColor },
+            ticks: { color: textColor }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: textColor, font: { size: 13 } }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
