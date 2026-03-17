@@ -101,34 +101,7 @@ graph TD
 
 The parallel kernel distributes output tiles across CPU cores via OpenMP. Each thread owns distinct tiles — no synchronization needed:
 
-```mermaid
-graph TD
-    subgraph "Thread 0"
-        direction LR
-        T0A["Tile 0,0"] ~~~ T0B["Tile 0,1"]
-    end
-    subgraph "Thread 1"
-        direction LR
-        T1A["Tile 1,0"] ~~~ T1B["Tile 1,1"]
-    end
-    subgraph "Thread 2"
-        direction LR
-        T2A["Tile 2,0"] ~~~ T2B["Tile 2,1"]
-    end
-    subgraph "Thread 3"
-        direction LR
-        T3A["Tile 3,0"] ~~~ T3B["Tile 3,1"]
-    end
-
-    style T0A fill:#4CAF50,color:#fff
-    style T0B fill:#4CAF50,color:#fff
-    style T1A fill:#FF9800,color:#fff
-    style T1B fill:#FF9800,color:#fff
-    style T2A fill:#2196F3,color:#fff
-    style T2B fill:#2196F3,color:#fff
-    style T3A fill:#9C27B0,color:#fff
-    style T3B fill:#9C27B0,color:#fff
-```
+![Parallel tile distribution across 4 threads](docs/parallel_tile_distribution.svg)
 
 At small matrix sizes (N=128), thread overhead can dominate — more threads actually hurts. At large N (1024+), scaling continues up to the hardware thread limit.
 
