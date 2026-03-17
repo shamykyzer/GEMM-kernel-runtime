@@ -297,13 +297,20 @@ Deterministic seeding ensures reproducible inputs. Warmup stabilizes CPU frequen
 
 ## Roadmap
 
-- [x] Tensor class with row-major storage
-- [x] Naive GEMM (baseline)
-- [x] Timer + benchmark harness
-- [x] Tiled GEMM (cache optimization)
-- [x] Parallel GEMM (OpenMP + thread scaling)
-- [ ] Softmax kernel (reduction across tiles — fundamentally different from GEMM's embarrassingly parallel pattern)
-- [ ] Scheduler abstraction
+- [x] **Phase 1** — Bootstrap repo layout and CMake build system
+- [x] **Phase 2** — Tensor class with row-major storage, utility methods, and tests
+- [x] **Phase 3** — Naive GEMM as correctness reference
+- [x] **Phase 4** — Timer + benchmark harness (GFLOPS, speedup, block/thread sweep)
+- [x] **Phase 5** — Tiled GEMM (cache-friendly block loop)
+- [x] **Phase 6** — Parallel GEMM (OpenMP + thread scaling benchmark)
+- [ ] **Phase 7** — TileTask abstraction and `make_tasks()` helper
+- [ ] **Phase 8** — Minimal scheduler layer (static + work-stealing variant)
+- [ ] **Phase 9** — Full test coverage including scheduler tests
+- [ ] **Phase 10** — Docs: architecture, performance analysis, Graphcore-inspired design, `make profile` with `perf stat`
+- [ ] **Phase 11** — Naive softmax kernel (row-wise, log-sum-exp trick)
+- [ ] **Phase 12** — Tiled softmax with partial reduction + online (single-pass) softmax
+- [ ] **Phase 13** — Parallel softmax (OpenMP, row-parallel + tiled reduction)
+- [ ] **Phase 14** — Softmax benchmark integration (time, throughput, speedup sweep)
 
 ## Design Decisions
 
