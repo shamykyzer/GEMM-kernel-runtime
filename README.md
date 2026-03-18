@@ -1,6 +1,6 @@
-# ML Kernel Runtime
+# GEMM Optimization Kernel Engine
 
-**A from-scratch C++17 tile-based matrix kernel runtime, achieving 46x speedup over naive GEMM through cache-aware tiling and OpenMP parallelism.**
+**A C++17 tile-based matrix kernel runtime, achieving 46x speedup over naive GEMM through cache-aware tiling and OpenMP parallelism.**
 
 Inspired by how ML accelerator runtimes (Graphcore Poplibs, XLA) schedule compute across tiles, this project implements progressively optimized GEMM kernels on CPU to explore the performance gap between naive and production-quality approaches.
 
