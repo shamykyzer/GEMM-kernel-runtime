@@ -1,4 +1,4 @@
-# GEMM Optimization Kernel Engine
+# GEMM Kernel Optimization Engine
 
 **A C++17 tile-based matrix kernel runtime, achieving 46x speedup over naive GEMM through cache-aware tiling and OpenMP parallelism.**
 
