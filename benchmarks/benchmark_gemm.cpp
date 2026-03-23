@@ -4,6 +4,7 @@
 #include "cpu_features.h"
 
 #include <cstddef>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -18,10 +19,12 @@ using tile_runtime::Timer;
 
 struct BenchResult {
     std::string label;
+    size_t N;
     size_t block_size;
     int threads;
     double time_ms;
     double gflops;
+    double speedup;
 };
 
 static double compute_gflops(size_t N, double seconds) {
@@ -70,7 +73,7 @@ static BenchResult bench_kernel(const std::string& label, size_t N,
 
     double avg_ms = total_ms / trials;
     double avg_sec = avg_ms / 1000.0;
-    return {label, 0, 1, avg_ms, compute_gflops(N, avg_sec)};
+    return {label, N, 0, 1, avg_ms, compute_gflops(N, avg_sec), 0.0};
 }
 
 static BenchResult bench_tiled(const std::string& label, size_t N,
@@ -97,7 +100,7 @@ static BenchResult bench_tiled(const std::string& label, size_t N,
 
     double avg_ms = total_ms / trials;
     double avg_sec = avg_ms / 1000.0;
-    return {label, block_size, 1, avg_ms, compute_gflops(N, avg_sec)};
+    return {label, N, block_size, 1, avg_ms, compute_gflops(N, avg_sec), 0.0};
 }
 
 static BenchResult bench_parallel(const std::string& label, size_t N,
@@ -127,7 +130,7 @@ static BenchResult bench_parallel(const std::string& label, size_t N,
 
     double avg_ms = total_ms / trials;
     double avg_sec = avg_ms / 1000.0;
-    return {label, block_size, actual_threads, avg_ms, compute_gflops(N, avg_sec)};
+    return {label, N, block_size, actual_threads, avg_ms, compute_gflops(N, avg_sec), 0.0};
 }
 
 static void print_baseline(const BenchResult& r) {
@@ -183,6 +186,8 @@ int main() {
               << " AVX512F=" << cpu.avx512f << " AVX512VL=" << cpu.avx512vl
               << std::endl;
 
+    std::vector<BenchResult> all_results;
+
     for (size_t N : sizes) {
         std::cout << std::endl;
         std::cout << "=== N=" << N << " ===" << std::endl;
@@ -190,24 +195,33 @@ int main() {
         // --- Naive baseline ---
         auto naive = bench_kernel("naive", N, tile_runtime::gemm_naive,
                                   warmup, trials);
+        naive.speedup = 1.0;
         print_baseline(naive);
+        all_results.push_back(naive);
 
         // --- Tiled variants (single-threaded) ---
         std::string best_label;
         double best_ms = naive.time_ms;
         size_t best_bs = 16;
 
+        auto record = [&](BenchResult& r) {
+            r.speedup = (r.time_ms > 0.0) ? naive.time_ms / r.time_ms : 0.0;
+            all_results.push_back(r);
+            if (r.time_ms < best_ms) {
+                best_ms = r.time_ms;
+                best_bs = r.block_size > 0 ? r.block_size : best_bs;
+                best_label = r.label;
+                if (r.block_size > 0) best_label += " bs=" + std::to_string(r.block_size);
+                if (r.threads > 1) best_label += " t=" + std::to_string(r.threads);
+            }
+        };
+
         for (size_t bs : block_sizes) {
             auto tiled = bench_tiled("tiled", N, bs,
                                      tile_runtime::gemm_tiled,
                                      warmup, trials);
             print_row(tiled, naive.time_ms);
-
-            if (tiled.time_ms < best_ms) {
-                best_ms = tiled.time_ms;
-                best_bs = bs;
-                best_label = "tiled bs=" + std::to_string(bs);
-            }
+            record(tiled);
         }
 
         // --- Parallel thread scaling (use best block size) ---
@@ -217,12 +231,7 @@ int main() {
                                       tile_runtime::gemm_parallel,
                                       warmup, trials, t);
             print_row(par, naive.time_ms);
-
-            if (par.time_ms < best_ms) {
-                best_ms = par.time_ms;
-                best_label = "parallel bs=" + std::to_string(best_bs)
-                           + " t=" + std::to_string(par.threads);
-            }
+            record(par);
         }
 
         // --- SIMD kernels (single-threaded) ---
@@ -230,20 +239,14 @@ int main() {
             auto avx = bench_tiled("avx2+fma", N, best_bs,
                                     tile_runtime::gemm_avx, warmup, trials);
             print_row(avx, naive.time_ms);
-            if (avx.time_ms < best_ms) {
-                best_ms = avx.time_ms;
-                best_label = "avx2+fma bs=" + std::to_string(best_bs);
-            }
+            record(avx);
         }
 
         if (cpu.avx512f) {
             auto avx512 = bench_tiled("avx-512", N, best_bs,
                                        tile_runtime::gemm_avx512, warmup, trials);
             print_row(avx512, naive.time_ms);
-            if (avx512.time_ms < best_ms) {
-                best_ms = avx512.time_ms;
-                best_label = "avx-512 bs=" + std::to_string(best_bs);
-            }
+            record(avx512);
         }
 
 #ifdef TILE_HAS_STD_SIMD
@@ -251,10 +254,7 @@ int main() {
             auto simd = bench_tiled("std-simd", N, best_bs,
                                      tile_runtime::gemm_simd, warmup, trials);
             print_row(simd, naive.time_ms);
-            if (simd.time_ms < best_ms) {
-                best_ms = simd.time_ms;
-                best_label = "std-simd bs=" + std::to_string(best_bs);
-            }
+            record(simd);
         }
 #endif
 
@@ -265,11 +265,7 @@ int main() {
                                                 tile_runtime::gemm_parallel_simd,
                                                 warmup, trials, t);
                 print_row(par_simd, naive.time_ms);
-                if (par_simd.time_ms < best_ms) {
-                    best_ms = par_simd.time_ms;
-                    best_label = "parallel+simd bs=" + std::to_string(best_bs)
-                               + " t=" + std::to_string(par_simd.threads);
-                }
+                record(par_simd);
             }
         }
 
@@ -284,5 +280,24 @@ int main() {
     }
 
     std::cout << std::endl;
+
+    // --- Write CSV ---
+    std::ofstream csv("benchmark_results.csv");
+    if (csv.is_open()) {
+        csv << "kernel,N,block_size,threads,time_ms,gflops,speedup\n";
+        csv << std::fixed;
+        for (const auto& r : all_results) {
+            csv << r.label << ","
+                << r.N << ","
+                << r.block_size << ","
+                << r.threads << ","
+                << std::setprecision(2) << r.time_ms << ","
+                << std::setprecision(2) << r.gflops << ","
+                << std::setprecision(1) << r.speedup << "\n";
+        }
+        csv.close();
+        std::cout << "Results written to benchmark_results.csv" << std::endl;
+    }
+
     return 0;
 }
