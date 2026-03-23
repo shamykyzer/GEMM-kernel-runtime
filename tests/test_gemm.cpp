@@ -1,6 +1,7 @@
 #include "test_utils.h"
 #include "gemm.h"
 #include "tensor.h"
+#include "cpu_features.h"
 
 using tile_runtime::Tensor;
 using tile_runtime::gemm_naive;
@@ -251,6 +252,8 @@ void test_parallel_single_thread() {
 // --- AVX GEMM tests ---
 
 void test_avx_matches_naive() {
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+    if (!cpu.avx2 || !cpu.fma) { std::cout << "(skipped, no AVX2+FMA) "; return; }
     size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
     size_t block_sizes[] = {8, 16, 32};
 
@@ -274,6 +277,8 @@ void test_avx_matches_naive() {
 }
 
 void test_avx_rectangular() {
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+    if (!cpu.avx2 || !cpu.fma) { std::cout << "(skipped) "; return; }
     Tensor A(3, 5), B(5, 17), C_naive(3, 17), C_avx(3, 17);
     A.randomize(1300);
     B.randomize(1400);
@@ -289,6 +294,8 @@ void test_avx_rectangular() {
 // --- AVX-512 GEMM tests ---
 
 void test_avx512_matches_naive() {
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+    if (!cpu.avx512f) { std::cout << "(skipped, no AVX-512) "; return; }
     size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
     size_t block_sizes[] = {8, 16, 32};
 
@@ -341,6 +348,8 @@ void test_simd_matches_naive() {
 // --- Parallel+SIMD GEMM tests ---
 
 void test_parallel_simd_matches_naive() {
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+    if (!cpu.avx2 || !cpu.fma) { std::cout << "(skipped, no AVX2+FMA) "; return; }
     size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
     size_t block_sizes[] = {8, 16, 32};
 

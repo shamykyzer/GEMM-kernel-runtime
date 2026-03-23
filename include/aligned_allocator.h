@@ -4,6 +4,10 @@
 #include <cstdlib>
 #include <new>
 
+#if defined(_MSC_VER)
+#include <malloc.h>
+#endif
+
 namespace tile_runtime {
 
 template <typename T, std::size_t Alignment = 64>

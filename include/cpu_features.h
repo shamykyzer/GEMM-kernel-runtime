@@ -20,8 +20,10 @@ struct CpuFeatures {
 private:
     static CpuFeatures query() {
         CpuFeatures f{};
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__) && !defined(__clang__)
         __builtin_cpu_init();
+#endif
+#if defined(__GNUC__) || defined(__clang__)
         f.avx2     = __builtin_cpu_supports("avx2");
         f.fma      = __builtin_cpu_supports("fma");
         f.avx512f  = __builtin_cpu_supports("avx512f");
