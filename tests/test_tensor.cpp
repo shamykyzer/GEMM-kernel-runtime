@@ -1,6 +1,8 @@
 #include "test_utils.h"
 #include "tensor.h"
 
+#include <cstdint>
+
 using tile_runtime::Tensor;
 
 void test_default_construction() {
@@ -108,6 +110,22 @@ void test_data_pointer() {
     ASSERT_NEAR(t.data()[5], 42.0f);
 }
 
+void test_aligned_allocation() {
+    Tensor t(64, 64);
+    uintptr_t addr = reinterpret_cast<uintptr_t>(t.data());
+    ASSERT_TRUE((addr % 64) == 0);
+
+    // Small tensor should also be aligned
+    Tensor small(1, 1);
+    uintptr_t small_addr = reinterpret_cast<uintptr_t>(small.data());
+    ASSERT_TRUE((small_addr % 64) == 0);
+
+    // Non-power-of-2 dimensions
+    Tensor odd(7, 13);
+    uintptr_t odd_addr = reinterpret_cast<uintptr_t>(odd.data());
+    ASSERT_TRUE((odd_addr % 64) == 0);
+}
+
 int main() {
     std::cout << "test_tensor:" << std::endl;
     RUN_TEST(test_default_construction);
@@ -121,5 +139,6 @@ int main() {
     RUN_TEST(test_randomize_different_seeds);
     RUN_TEST(test_copy_independence);
     RUN_TEST(test_data_pointer);
+    RUN_TEST(test_aligned_allocation);
     TEST_SUMMARY("test_tensor");
 }

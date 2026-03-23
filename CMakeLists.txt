@@ -22,7 +22,18 @@ add_library(tile_runtime_core STATIC
   src/gemm_naive.cpp
   src/gemm_tiled.cpp
   src/gemm_parallel.cpp
+  src/gemm_avx.cpp
+  src/gemm_avx512.cpp
+  src/gemm_simd.cpp
+  src/gemm_parallel_simd.cpp
 )
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  set_source_files_properties(src/gemm_avx.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+  set_source_files_properties(src/gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
+  set_source_files_properties(src/gemm_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+  set_source_files_properties(src/gemm_parallel_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+endif()
 
 target_include_directories(tile_runtime_core
   PUBLIC

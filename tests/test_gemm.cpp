@@ -6,6 +6,10 @@ using tile_runtime::Tensor;
 using tile_runtime::gemm_naive;
 using tile_runtime::gemm_tiled;
 using tile_runtime::gemm_parallel;
+using tile_runtime::gemm_avx;
+using tile_runtime::gemm_avx512;
+using tile_runtime::gemm_simd;
+using tile_runtime::gemm_parallel_simd;
 
 // Helper: manual dot-product reference (not calling gemm_naive).
 static void reference_matmul(const Tensor& A, const Tensor& B, Tensor& C) {
@@ -242,6 +246,119 @@ void test_parallel_single_thread() {
             ASSERT_NEAR(C_parallel.at(i,j), C_naive.at(i,j));
 }
 
+// --- AVX GEMM tests ---
+
+void test_avx_matches_naive() {
+    size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
+    size_t block_sizes[] = {8, 16, 32};
+
+    for (size_t n : sizes) {
+        Tensor A(n, n), B(n, n);
+        A.randomize(1100 + static_cast<unsigned>(n));
+        B.randomize(1200 + static_cast<unsigned>(n));
+
+        Tensor C_naive(n, n), C_avx(n, n);
+        gemm_naive(A, B, C_naive);
+
+        for (size_t bs : block_sizes) {
+            C_avx.zero();
+            gemm_avx(A, B, C_avx, bs);
+
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < n; ++j)
+                    ASSERT_NEAR(C_avx.at(i,j), C_naive.at(i,j));
+        }
+    }
+}
+
+void test_avx_rectangular() {
+    Tensor A(3, 5), B(5, 17), C_naive(3, 17), C_avx(3, 17);
+    A.randomize(1300);
+    B.randomize(1400);
+
+    gemm_naive(A, B, C_naive);
+    gemm_avx(A, B, C_avx, 8);
+
+    for (size_t i = 0; i < 3; ++i)
+        for (size_t j = 0; j < 17; ++j)
+            ASSERT_NEAR(C_avx.at(i,j), C_naive.at(i,j));
+}
+
+// --- AVX-512 GEMM tests ---
+
+void test_avx512_matches_naive() {
+    size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
+    size_t block_sizes[] = {8, 16, 32};
+
+    for (size_t n : sizes) {
+        Tensor A(n, n), B(n, n);
+        A.randomize(1500 + static_cast<unsigned>(n));
+        B.randomize(1600 + static_cast<unsigned>(n));
+
+        Tensor C_naive(n, n), C_avx512(n, n);
+        gemm_naive(A, B, C_naive);
+
+        for (size_t bs : block_sizes) {
+            C_avx512.zero();
+            gemm_avx512(A, B, C_avx512, bs);
+
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < n; ++j)
+                    ASSERT_NEAR(C_avx512.at(i,j), C_naive.at(i,j));
+        }
+    }
+}
+
+// --- std-simd GEMM tests ---
+
+void test_simd_matches_naive() {
+    size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
+    size_t block_sizes[] = {8, 16, 32};
+
+    for (size_t n : sizes) {
+        Tensor A(n, n), B(n, n);
+        A.randomize(1700 + static_cast<unsigned>(n));
+        B.randomize(1800 + static_cast<unsigned>(n));
+
+        Tensor C_naive(n, n), C_simd(n, n);
+        gemm_naive(A, B, C_naive);
+
+        for (size_t bs : block_sizes) {
+            C_simd.zero();
+            gemm_simd(A, B, C_simd, bs);
+
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < n; ++j)
+                    ASSERT_NEAR(C_simd.at(i,j), C_naive.at(i,j));
+        }
+    }
+}
+
+// --- Parallel+SIMD GEMM tests ---
+
+void test_parallel_simd_matches_naive() {
+    size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
+    size_t block_sizes[] = {8, 16, 32};
+
+    for (size_t n : sizes) {
+        Tensor A(n, n), B(n, n);
+        A.randomize(1900 + static_cast<unsigned>(n));
+        B.randomize(2000 + static_cast<unsigned>(n));
+
+        Tensor C_naive(n, n), C_par_simd(n, n);
+        gemm_naive(A, B, C_naive);
+
+        for (size_t bs : block_sizes) {
+            C_par_simd.zero();
+            gemm_parallel_simd(A, B, C_par_simd, bs);
+
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < n; ++j)
+                    ASSERT_NEAR(C_par_simd.at(i,j), C_naive.at(i,j));
+        }
+    }
+}
+
 int main() {
     std::cout << "test_gemm (naive):" << std::endl;
     RUN_TEST(test_2x2_known);
@@ -263,6 +380,19 @@ int main() {
     RUN_TEST(test_parallel_rectangular);
     RUN_TEST(test_parallel_dimension_mismatch);
     RUN_TEST(test_parallel_single_thread);
+
+    std::cout << "test_gemm (avx):" << std::endl;
+    RUN_TEST(test_avx_matches_naive);
+    RUN_TEST(test_avx_rectangular);
+
+    std::cout << "test_gemm (avx512):" << std::endl;
+    RUN_TEST(test_avx512_matches_naive);
+
+    std::cout << "test_gemm (simd):" << std::endl;
+    RUN_TEST(test_simd_matches_naive);
+
+    std::cout << "test_gemm (parallel+simd):" << std::endl;
+    RUN_TEST(test_parallel_simd_matches_naive);
 
     TEST_SUMMARY("test_gemm");
 }

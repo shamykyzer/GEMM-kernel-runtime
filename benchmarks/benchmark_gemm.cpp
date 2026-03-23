@@ -1,6 +1,7 @@
 #include "tensor.h"
 #include "gemm.h"
 #include "timer.h"
+#include "cpu_features.h"
 
 #include <cstddef>
 #include <iomanip>
@@ -173,9 +174,14 @@ int main() {
     const int trials = 5;
     const int max_threads = get_max_threads();
 
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+
     std::cout << "=== ML Kernel Runtime Benchmark ===" << std::endl;
     std::cout << "Warmup: " << warmup << "  Trials: " << trials
               << "  Max threads: " << max_threads << std::endl;
+    std::cout << "CPU: AVX2=" << cpu.avx2 << " FMA=" << cpu.fma
+              << " AVX512F=" << cpu.avx512f << " AVX512VL=" << cpu.avx512vl
+              << std::endl;
 
     for (size_t N : sizes) {
         std::cout << std::endl;
@@ -216,6 +222,52 @@ int main() {
                 best_ms = par.time_ms;
                 best_label = "parallel bs=" + std::to_string(best_bs)
                            + " t=" + std::to_string(par.threads);
+            }
+        }
+
+        // --- SIMD kernels (single-threaded) ---
+        if (cpu.avx2 && cpu.fma) {
+            auto avx = bench_tiled("avx2+fma", N, best_bs,
+                                    tile_runtime::gemm_avx, warmup, trials);
+            print_row(avx, naive.time_ms);
+            if (avx.time_ms < best_ms) {
+                best_ms = avx.time_ms;
+                best_label = "avx2+fma bs=" + std::to_string(best_bs);
+            }
+        }
+
+        if (cpu.avx512f) {
+            auto avx512 = bench_tiled("avx-512", N, best_bs,
+                                       tile_runtime::gemm_avx512, warmup, trials);
+            print_row(avx512, naive.time_ms);
+            if (avx512.time_ms < best_ms) {
+                best_ms = avx512.time_ms;
+                best_label = "avx-512 bs=" + std::to_string(best_bs);
+            }
+        }
+
+        {
+            auto simd = bench_tiled("std-simd", N, best_bs,
+                                     tile_runtime::gemm_simd, warmup, trials);
+            print_row(simd, naive.time_ms);
+            if (simd.time_ms < best_ms) {
+                best_ms = simd.time_ms;
+                best_label = "std-simd bs=" + std::to_string(best_bs);
+            }
+        }
+
+        // --- Parallel + SIMD ---
+        if (cpu.avx2 && cpu.fma) {
+            for (int t : threads) {
+                auto par_simd = bench_parallel("parallel+simd", N, best_bs,
+                                                tile_runtime::gemm_parallel_simd,
+                                                warmup, trials, t);
+                print_row(par_simd, naive.time_ms);
+                if (par_simd.time_ms < best_ms) {
+                    best_ms = par_simd.time_ms;
+                    best_label = "parallel+simd bs=" + std::to_string(best_bs)
+                               + " t=" + std::to_string(par_simd.threads);
+                }
             }
         }
 
