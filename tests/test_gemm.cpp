@@ -8,7 +8,9 @@ using tile_runtime::gemm_tiled;
 using tile_runtime::gemm_parallel;
 using tile_runtime::gemm_avx;
 using tile_runtime::gemm_avx512;
+#ifdef TILE_HAS_STD_SIMD
 using tile_runtime::gemm_simd;
+#endif
 using tile_runtime::gemm_parallel_simd;
 
 // Helper: manual dot-product reference (not calling gemm_naive).
@@ -311,6 +313,7 @@ void test_avx512_matches_naive() {
 
 // --- std-simd GEMM tests ---
 
+#ifdef TILE_HAS_STD_SIMD
 void test_simd_matches_naive() {
     size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
     size_t block_sizes[] = {8, 16, 32};
@@ -333,6 +336,7 @@ void test_simd_matches_naive() {
         }
     }
 }
+#endif
 
 // --- Parallel+SIMD GEMM tests ---
 
@@ -388,8 +392,10 @@ int main() {
     std::cout << "test_gemm (avx512):" << std::endl;
     RUN_TEST(test_avx512_matches_naive);
 
+#ifdef TILE_HAS_STD_SIMD
     std::cout << "test_gemm (simd):" << std::endl;
     RUN_TEST(test_simd_matches_naive);
+#endif
 
     std::cout << "test_gemm (parallel+simd):" << std::endl;
     RUN_TEST(test_parallel_simd_matches_naive);

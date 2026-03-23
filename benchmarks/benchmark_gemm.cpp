@@ -246,6 +246,7 @@ int main() {
             }
         }
 
+#ifdef TILE_HAS_STD_SIMD
         {
             auto simd = bench_tiled("std-simd", N, best_bs,
                                      tile_runtime::gemm_simd, warmup, trials);
@@ -255,6 +256,7 @@ int main() {
                 best_label = "std-simd bs=" + std::to_string(best_bs);
             }
         }
+#endif
 
         // --- Parallel + SIMD ---
         if (cpu.avx2 && cpu.fma) {

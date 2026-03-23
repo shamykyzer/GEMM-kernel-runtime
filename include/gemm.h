@@ -23,8 +23,10 @@ void gemm_avx(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
 // AVX-512 vectorized tiled GEMM (16-wide float, requires AVX-512F CPU).
 void gemm_avx512(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
 
+#ifdef TILE_HAS_STD_SIMD
 // Portable SIMD GEMM using std::experimental::simd.
 void gemm_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
+#endif
 
 // OpenMP-parallelized AVX2 tiled GEMM (parallel tiles + vectorized inner loop).
 void gemm_parallel_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
