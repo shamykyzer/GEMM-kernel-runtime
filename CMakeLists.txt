@@ -25,6 +25,7 @@ set(TILE_CORE_SOURCES
   src/gemm_avx.cpp
   src/gemm_avx512.cpp
   src/gemm_parallel_simd.cpp
+  src/gemm_parallel_avx512.cpp
 )
 
 # std::experimental::simd is only available on GCC (libstdc++)
@@ -42,6 +43,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   set_source_files_properties(src/gemm_avx.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
   set_source_files_properties(src/gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
   set_source_files_properties(src/gemm_parallel_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+  set_source_files_properties(src/gemm_parallel_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set_source_files_properties(src/gemm_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
   endif()
@@ -49,6 +51,7 @@ elseif(MSVC)
   set_source_files_properties(src/gemm_avx.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
   set_source_files_properties(src/gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX512")
   set_source_files_properties(src/gemm_parallel_simd.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_source_files_properties(src/gemm_parallel_avx512.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX512")
 endif()
 
 target_include_directories(tile_runtime_core

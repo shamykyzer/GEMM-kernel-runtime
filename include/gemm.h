@@ -31,4 +31,7 @@ void gemm_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
 // OpenMP-parallelized AVX2 tiled GEMM (parallel tiles + vectorized inner loop).
 void gemm_parallel_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
 
+// OpenMP-parallelized AVX-512 tiled GEMM (parallel tiles + 16-wide vectorized inner loop).
+void gemm_parallel_avx512(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size);
+
 }  // namespace tile_runtime

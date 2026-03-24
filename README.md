@@ -6,13 +6,14 @@ Inspired by how ML accelerator runtimes (Graphcore Poplibs, XLA) schedule comput
 
 ```
 === N=1024 ===
-  naive                       7007.64 ms      0.31 GFLOPS   (baseline)
-  tiled  bs=16                 866.00 ms      2.48 GFLOPS      8.1x
-  parallel  bs=16  t=16        123.70 ms     17.36 GFLOPS     56.7x
-  avx2+fma  bs=16               65.07 ms     33.00 GFLOPS    107.7x
-  avx-512   bs=16               43.35 ms     49.54 GFLOPS    161.7x
-  std-simd  bs=16              155.57 ms     13.80 GFLOPS     45.0x
-  parallel+simd bs=16 t=16      12.09 ms    177.61 GFLOPS    579.6x
+  naive                       6932.87 ms      0.31 GFLOPS   (baseline)
+  tiled  bs=32                1245.03 ms      1.72 GFLOPS      5.6x
+  parallel  bs=32  t=16        160.87 ms     13.35 GFLOPS     43.1x
+  avx2+fma  bs=32               65.41 ms     32.83 GFLOPS    106.0x
+  avx-512   bs=32               33.04 ms     65.00 GFLOPS    209.8x
+  std-simd  bs=32              148.35 ms     14.48 GFLOPS     46.7x
+  parallel+simd bs=32 t=16     13.60 ms    157.88 GFLOPS    509.7x
+  parallel+avx512 bs=32 t=20    6.95 ms    308.99 GFLOPS    997.5x
 ```
 
 > Run `make bench` to see actual numbers on your hardware.
@@ -25,8 +26,8 @@ Inspired by how ML accelerator runtimes (Graphcore Poplibs, XLA) schedule comput
 
 ## Features
 
-- **Seven GEMM kernel variants:** naive, tiled, parallel, AVX2+FMA, AVX-512, std::experimental::simd, and parallel+SIMD
-- **SIMD vectorization:** hand-tuned 4x8 (AVX2) and 4x16 (AVX-512) micro-kernels with FMA and prefetching
+- **Eight GEMM kernel variants:** naive, tiled, parallel, AVX2+FMA, AVX-512, std::experimental::simd, parallel+SIMD, and parallel+AVX-512
+- **SIMD vectorization:** hand-tuned 4x8 (AVX2) and 4x16 (AVX-512) micro-kernels with FMA, prefetching, and masked edge handling
 - **Cache-line-aligned memory:** 64-byte aligned allocator for Tensor storage, optimized for SIMD loads and cache efficiency
 - **Runtime CPU detection:** CPUID-based feature detection guards SIMD kernel dispatch (AVX2, FMA, AVX-512F/VL)
 - **Portable SIMD:** std::experimental::simd kernel demonstrates C++ standard SIMD abstraction vs hand-written intrinsics
@@ -61,7 +62,7 @@ make clean    # remove build directory
 │   └── design_decisions.md       # upfront design decisions
 ├── include/
 │   ├── tensor.h                  # Tensor class (64-byte aligned storage)
-│   ├── gemm.h                    # GEMM kernel declarations (7 variants)
+│   ├── gemm.h                    # GEMM kernel declarations (8 variants)
 │   ├── timer.h                   # Timer class
 │   ├── aligned_allocator.h       # Cache-line-aligned allocator for std::vector
 │   └── cpu_features.h            # Runtime CPUID detection (AVX2/FMA/AVX-512)
@@ -73,7 +74,8 @@ make clean    # remove build directory
 │   ├── gemm_avx.cpp              # AVX2+FMA GEMM (4x8 micro-kernel)
 │   ├── gemm_avx512.cpp           # AVX-512 GEMM (4x16 micro-kernel, masked edges)
 │   ├── gemm_simd.cpp             # std::experimental::simd portable GEMM
-│   └── gemm_parallel_simd.cpp    # OpenMP + AVX2 combined GEMM
+│   ├── gemm_parallel_simd.cpp    # OpenMP + AVX2 combined GEMM
+│   └── gemm_parallel_avx512.cpp  # OpenMP + AVX-512 combined GEMM
 ├── tests/
 │   ├── test_utils.h              # assertion macros
 │   ├── test_tensor.cpp           # tensor tests (12 cases incl. alignment)
@@ -93,6 +95,7 @@ make clean    # remove build directory
 | `gemm_avx512` | Tiled + AVX-512 4x16 micro-kernel + masked edges | AVX-512 (16-wide) | 1 | Run `make bench` |
 | `gemm_simd` | Tiled + std::experimental::simd (portable) | native_simd | 1 | Run `make bench` |
 | `gemm_parallel_simd` | OpenMP parallel tiles + AVX2 inner loop | AVX2 (8-wide) | All | Run `make bench` |
+| `gemm_parallel_avx512` | OpenMP parallel tiles + AVX-512 inner loop + masked edges | AVX-512 (16-wide) | All | Run `make bench` |
 
 ### SIMD Micro-Kernel Register Tiling
 
@@ -100,11 +103,11 @@ make clean    # remove build directory
 
 ### Thread Scaling
 
-The parallel kernel distributes output tiles across CPU cores via OpenMP. Each thread owns distinct tiles, so no synchronization is needed:
+The parallel kernels distribute output tiles across CPU cores via OpenMP. Each thread owns distinct tiles, so no synchronization is needed:
 
 ![Parallel tile distribution across 4 threads](docs/parallel_tiles.svg)
 
-At small matrix sizes (N=128), thread overhead dominates and adding more threads actually hurts. At large N (1024+), scaling continues up to the hardware thread limit.
+At small matrix sizes (N=128), thread overhead dominates and adding more threads actually hurts. At large N (1024+), the parallel+AVX-512 kernel scales continuously up to all available threads, reaching 309 GFLOPS at 20 threads.
 
 ![Thread Scaling Chart](docs/thread_scaling_chart.svg)
 
@@ -217,7 +220,21 @@ Thread 2: tile(2,0) → AVX2 4x8 micro-kernel inside
 ...
 ```
 
-This is the fastest kernel in the project. It exploits both instruction-level parallelism (SIMD) and thread-level parallelism (OpenMP) simultaneously.
+</details>
+
+<details>
+<summary><strong>Parallel + AVX-512: Maximum Throughput</strong></summary>
+
+`gemm_parallel_avx512` is the fastest kernel in the project. It combines OpenMP tile distribution with AVX-512 4x16 micro-kernels and masked edge handling inside each tile. Each thread gets its own tile region (no synchronization), and within each tile the inner loops use 512-bit ZMM registers processing 16 floats per instruction.
+
+```
+Thread 0: tile(0,0) → AVX-512 4x16 micro-kernel + masked edges
+Thread 1: tile(1,0) → AVX-512 4x16 micro-kernel + masked edges
+Thread 2: tile(2,0) → AVX-512 4x16 micro-kernel + masked edges
+...
+```
+
+This exploits both instruction-level parallelism (16-wide SIMD) and thread-level parallelism (OpenMP) simultaneously. The 2x wider registers over AVX2 combined with masked operations for edge cases delivers ~2x throughput per thread, scaling to 309 GFLOPS at 20 threads — a 998x speedup over the naive baseline.
 
 </details>
 

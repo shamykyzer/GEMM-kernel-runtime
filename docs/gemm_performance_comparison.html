@@ -54,8 +54,8 @@
     .highlight-card .value { font-size: 26px; font-weight: 700; }
     .highlight-card .detail { font-size: 11px; color: var(--text3); margin-top: 4px; }
     .section-title { font-size: 15px; font-weight: 600; margin: 2rem 0 0.75rem; color: var(--text); }
-    .chart-container { position: relative; width: 100%; height: 320px; margin-bottom: 0.5rem; }
-    .chart-container-sm { position: relative; width: 100%; height: 260px; margin-bottom: 0.5rem; }
+    .chart-container { position: relative; width: 100%; height: 360px; margin-bottom: 0.5rem; }
+    .chart-container-sm { position: relative; width: 100%; height: 300px; margin-bottom: 0.5rem; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -89,30 +89,30 @@
     }
     tr:last-child td { border-bottom: none; }
     .mono { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; }
-    .best { color: #A78BFA; font-weight: 600; }
+    .best { color: #FB7185; font-weight: 600; }
     footer { margin-top: 2rem; font-size: 11px; color: var(--text3); }
     footer a { color: var(--text2); }
   </style>
 </head>
 <body>
   <h1>GEMM Performance Comparison</h1>
-  <p class="subtitle">N=1024 square matrices, bs=16, best thread count for parallel kernels</p>
+  <p class="subtitle">N=1024 square matrices, bs=32, best thread count for parallel kernels</p>
 
   <div class="highlight-row">
     <div class="highlight-card">
       <div class="label">Baseline (naive)</div>
       <div class="value" style="color: #EF4444;">0.31</div>
-      <div class="detail">GFLOPS / 7,008 ms</div>
+      <div class="detail">GFLOPS / 6,933 ms</div>
     </div>
     <div class="highlight-card">
       <div class="label">Best single-thread (AVX-512)</div>
-      <div class="value" style="color: #38BDF8;">49.5</div>
-      <div class="detail">GFLOPS / 43 ms / 162x</div>
+      <div class="value" style="color: #38BDF8;">65.0</div>
+      <div class="detail">GFLOPS / 33 ms / 210x</div>
     </div>
     <div class="highlight-card">
-      <div class="label">Best overall (parallel+SIMD)</div>
-      <div class="value" style="color: #A78BFA;">177.6</div>
-      <div class="detail">GFLOPS / 12 ms / 580x</div>
+      <div class="label">Best overall (parallel+AVX-512)</div>
+      <div class="value" style="color: #FB7185;">309.0</div>
+      <div class="detail">GFLOPS / 6.95 ms / 998x</div>
     </div>
   </div>
 
@@ -128,9 +128,10 @@
     <span><span class="dot" style="background:#3B82F6;"></span>AVX2+FMA</span>
     <span><span class="dot" style="background:#1D4ED8;"></span>AVX-512</span>
     <span><span class="dot" style="background:#8B5CF6;"></span>Parallel+SIMD</span>
+    <span><span class="dot" style="background:#E11D48;"></span>Parallel+AVX-512</span>
   </div>
 
-  <p class="section-title">Parallel+SIMD Thread Scaling (N=1024)</p>
+  <p class="section-title">Thread Scaling (N=1024)</p>
   <div class="chart-container-sm">
     <canvas id="threadChart"></canvas>
   </div>
@@ -150,31 +151,35 @@
       <tbody>
         <tr>
           <td class="mono">gemm_naive</td><td>1</td>
-          <td>7,007.64</td><td>0.31</td><td>1.0x</td>
+          <td>6,932.87</td><td>0.31</td><td>1.0x</td>
         </tr>
         <tr>
           <td class="mono">gemm_tiled</td><td>1</td>
-          <td>866.00</td><td>2.48</td><td>8.1x</td>
+          <td>1,245.03</td><td>1.72</td><td>5.6x</td>
         </tr>
         <tr>
           <td class="mono">gemm_simd</td><td>1</td>
-          <td>155.57</td><td>13.80</td><td>45.0x</td>
+          <td>148.35</td><td>14.48</td><td>46.7x</td>
         </tr>
         <tr>
           <td class="mono">gemm_parallel</td><td>16</td>
-          <td>123.70</td><td>17.36</td><td>56.7x</td>
+          <td>160.87</td><td>13.35</td><td>43.1x</td>
         </tr>
         <tr>
           <td class="mono">gemm_avx</td><td>1</td>
-          <td>65.07</td><td>33.00</td><td>107.7x</td>
+          <td>65.41</td><td>32.83</td><td>106.0x</td>
         </tr>
         <tr>
           <td class="mono">gemm_avx512</td><td>1</td>
-          <td>43.35</td><td>49.54</td><td>161.7x</td>
+          <td>33.04</td><td>65.00</td><td>209.8x</td>
+        </tr>
+        <tr>
+          <td class="mono">gemm_parallel_simd</td><td>16</td>
+          <td>13.60</td><td>157.88</td><td>509.7x</td>
         </tr>
         <tr class="best">
-          <td class="mono best">gemm_parallel_simd</td><td>16</td>
-          <td>12.09</td><td>177.61</td><td>579.6x</td>
+          <td class="mono best">gemm_parallel_avx512</td><td>20</td>
+          <td>6.95</td><td>308.99</td><td>997.5x</td>
         </tr>
       </tbody>
     </table>
@@ -191,15 +196,13 @@
     const textColor = isDark ? '#94A3B8' : '#475569';
     const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 
-    const kernelColors = ['#EF4444', '#F97316', '#22C55E', '#3B82F6', '#1D4ED8', '#06B6D4', '#8B5CF6'];
-
     new Chart(document.getElementById('mainChart'), {
       type: 'bar',
       data: {
-        labels: ['Naive', 'Tiled', 'std::simd', 'Parallel (16t)', 'AVX2+FMA', 'AVX-512', 'Parallel+SIMD (16t)'],
+        labels: ['Naive', 'Tiled', 'std::simd', 'Parallel (16t)', 'AVX2+FMA', 'AVX-512', 'Parallel+SIMD (16t)', 'Parallel+AVX-512 (20t)'],
         datasets: [{
-          data: [0.31, 2.48, 13.80, 17.36, 33.00, 49.54, 177.61],
-          backgroundColor: ['#EF4444', '#F97316', '#06B6D4', '#22C55E', '#3B82F6', '#1D4ED8', '#8B5CF6'],
+          data: [0.31, 1.72, 14.48, 13.35, 32.83, 65.00, 157.88, 308.99],
+          backgroundColor: ['#EF4444', '#F97316', '#06B6D4', '#22C55E', '#3B82F6', '#1D4ED8', '#8B5CF6', '#E11D48'],
           borderRadius: 4,
           barPercentage: 0.65
         }]
@@ -235,8 +238,19 @@
       data: {
         labels: ['1', '2', '4', '8', '16', '20'],
         datasets: [{
+          label: 'Parallel+AVX-512',
+          data: [56.92, 110.07, 198.74, 215.90, 262.14, 308.99],
+          borderColor: '#E11D48',
+          backgroundColor: 'rgba(225, 29, 72, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 5,
+          pointBackgroundColor: '#E11D48',
+          pointBorderColor: isDark ? '#0F172A' : '#F8FAFC',
+          pointBorderWidth: 2
+        }, {
           label: 'Parallel+SIMD',
-          data: [26.93, 50.82, 85.99, 157.12, 177.61, 135.95],
+          data: [30.53, 61.90, 116.34, 139.40, 157.88, 140.99],
           borderColor: '#8B5CF6',
           backgroundColor: 'rgba(139, 92, 246, 0.1)',
           fill: true,
@@ -247,7 +261,7 @@
           pointBorderWidth: 2
         }, {
           label: 'Parallel (scalar)',
-          data: [2.47, 4.80, 8.78, 10.86, 17.36, 15.71],
+          data: [1.17, 3.26, 5.95, 8.67, 13.35, 10.94],
           borderColor: '#22C55E',
           backgroundColor: 'rgba(34, 197, 94, 0.1)',
           fill: true,

@@ -258,7 +258,7 @@ int main() {
         }
 #endif
 
-        // --- Parallel + SIMD ---
+        // --- Parallel + SIMD (AVX2) ---
         if (cpu.avx2 && cpu.fma) {
             for (int t : threads) {
                 auto par_simd = bench_parallel("parallel+simd", N, best_bs,
@@ -266,6 +266,17 @@ int main() {
                                                 warmup, trials, t);
                 print_row(par_simd, naive.time_ms);
                 record(par_simd);
+            }
+        }
+
+        // --- Parallel + AVX-512 ---
+        if (cpu.avx512f) {
+            for (int t : threads) {
+                auto par_avx512 = bench_parallel("parallel+avx512", N, best_bs,
+                                                  tile_runtime::gemm_parallel_avx512,
+                                                  warmup, trials, t);
+                print_row(par_avx512, naive.time_ms);
+                record(par_avx512);
             }
         }
 

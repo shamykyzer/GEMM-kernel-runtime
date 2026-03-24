@@ -13,6 +13,7 @@ using tile_runtime::gemm_avx512;
 using tile_runtime::gemm_simd;
 #endif
 using tile_runtime::gemm_parallel_simd;
+using tile_runtime::gemm_parallel_avx512;
 
 // Helper: manual dot-product reference (not calling gemm_naive).
 static void reference_matmul(const Tensor& A, const Tensor& B, Tensor& C) {
@@ -372,6 +373,33 @@ void test_parallel_simd_matches_naive() {
     }
 }
 
+// --- Parallel+AVX-512 GEMM tests ---
+
+void test_parallel_avx512_matches_naive() {
+    const auto& cpu = tile_runtime::CpuFeatures::detect();
+    if (!cpu.avx512f) { std::cout << "(skipped, no AVX-512) "; return; }
+    size_t sizes[] = {7, 15, 16, 17, 31, 32, 33, 64, 100};
+    size_t block_sizes[] = {8, 16, 32};
+
+    for (size_t n : sizes) {
+        Tensor A(n, n), B(n, n);
+        A.randomize(2100 + static_cast<unsigned>(n));
+        B.randomize(2200 + static_cast<unsigned>(n));
+
+        Tensor C_naive(n, n), C_par_avx512(n, n);
+        gemm_naive(A, B, C_naive);
+
+        for (size_t bs : block_sizes) {
+            C_par_avx512.zero();
+            gemm_parallel_avx512(A, B, C_par_avx512, bs);
+
+            for (size_t i = 0; i < n; ++i)
+                for (size_t j = 0; j < n; ++j)
+                    ASSERT_NEAR(C_par_avx512.at(i,j), C_naive.at(i,j));
+        }
+    }
+}
+
 int main() {
     std::cout << "test_gemm (naive):" << std::endl;
     RUN_TEST(test_2x2_known);
@@ -408,6 +436,9 @@ int main() {
 
     std::cout << "test_gemm (parallel+simd):" << std::endl;
     RUN_TEST(test_parallel_simd_matches_naive);
+
+    std::cout << "test_gemm (parallel+avx512):" << std::endl;
+    RUN_TEST(test_parallel_avx512_matches_naive);
 
     TEST_SUMMARY("test_gemm");
 }
