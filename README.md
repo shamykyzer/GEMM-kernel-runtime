@@ -96,7 +96,7 @@ make clean    # remove build directory
 
 ### SIMD Micro-Kernel Register Tiling
 
-![SIMD Micro-Kernel Register Tiling](docs/simd_microkernel.svg)
+![SIMD Micro-Kernel Register Tiling](docs/simd_microkernel.svg?v=2)
 
 ### Thread Scaling
 
