@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 580" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="benchGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#9333EA"/>
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#64748B"/>
+    </linearGradient>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="116%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#A78BFA"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#60A5FA"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="940" height="580" rx="16" fill="#0F172A"/>
+  <rect width="940" height="580" rx="16" fill="none" stroke="#1E293B" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="470" y="38" text-anchor="middle" fill="#F8FAFC" font-size="19" font-weight="700" letter-spacing="0.5">System Architecture</text>
+  <text x="470" y="56" text-anchor="middle" fill="#475569" font-size="11">ml-kernel-runtime — layered kernel design with runtime SIMD dispatch</text>
+
+  <!-- ═══ BENCHMARK LAYER ═══ -->
+  <rect x="40" y="72" width="860" height="88" rx="12" fill="#1E1338" fill-opacity="0.35" stroke="#7C3AED" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="62" y="93" fill="#A78BFA" font-size="10" font-weight="700" letter-spacing="2">BENCHMARK LAYER</text>
+
+  <rect x="220" y="100" width="500" height="48" rx="10" fill="url(#benchGrad)" filter="url(#shadow)"/>
+  <text x="470" y="121" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">benchmark_gemm</text>
+  <text x="470" y="138" text-anchor="middle" fill="#E9D5FF" font-size="10">GFLOPS throughput · speedup vs baseline · block-size sweep · thread-scaling sweep</text>
+
+  <!-- ═══ KERNEL LAYER ═══ -->
+  <rect x="40" y="186" width="860" height="205" rx="12" fill="#111827" fill-opacity="0.4" stroke="#3B82F6" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="62" y="208" fill="#93C5FD" font-size="10" font-weight="700" letter-spacing="2">KERNEL LAYER</text>
+
+  <!-- Scalar row -->
+  <text x="62" y="242" fill="#64748B" font-size="10" font-weight="600">Scalar</text>
+  <rect x="130" y="224" width="150" height="44" rx="8" fill="#DC2626" filter="url(#shadow)"/>
+  <text x="205" y="245" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_naive</text>
+  <text x="205" y="260" text-anchor="middle" fill="#FECACA" font-size="9">triple loop · O(N³)</text>
+
+  <rect x="295" y="224" width="150" height="44" rx="8" fill="#EA580C" filter="url(#shadow)"/>
+  <text x="370" y="245" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_tiled</text>
+  <text x="370" y="260" text-anchor="middle" fill="#FED7AA" font-size="9">cache-friendly blocks</text>
+
+  <rect x="460" y="224" width="170" height="44" rx="8" fill="#16A34A" filter="url(#shadow)"/>
+  <text x="545" y="245" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_parallel</text>
+  <text x="545" y="260" text-anchor="middle" fill="#BBF7D0" font-size="9">OpenMP + tiled · 46× speedup</text>
+
+  <!-- SIMD row -->
+  <text x="62" y="302" fill="#64748B" font-size="10" font-weight="600">SIMD</text>
+  <rect x="130" y="284" width="150" height="44" rx="8" fill="#2563EB" filter="url(#shadow)"/>
+  <text x="205" y="303" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_avx</text>
+  <text x="205" y="318" text-anchor="middle" fill="#BFDBFE" font-size="9">AVX2+FMA · 4×8 μkernel</text>
+
+  <rect x="295" y="284" width="150" height="44" rx="8" fill="#1D4ED8" filter="url(#shadow)"/>
+  <text x="370" y="303" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_avx512</text>
+  <text x="370" y="318" text-anchor="middle" fill="#BFDBFE" font-size="9">AVX-512 · 4×16 μkernel</text>
+
+  <rect x="460" y="284" width="170" height="44" rx="8" fill="#0891B2" filter="url(#shadow)"/>
+  <text x="545" y="303" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_simd</text>
+  <text x="545" y="318" text-anchor="middle" fill="#A5F3FC" font-size="9">std::experimental::simd</text>
+
+  <!-- Combined row -->
+  <text x="62" y="362" fill="#64748B" font-size="10" font-weight="600">Combined</text>
+  <rect x="130" y="344" width="245" height="44" rx="8" fill="#0D9488" filter="url(#shadow)"/>
+  <text x="252" y="364" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">gemm_parallel_simd</text>
+  <text x="252" y="379" text-anchor="middle" fill="#99F6E4" font-size="9">OpenMP threads + AVX2 per tile</text>
+
+  <!-- Runtime Dispatch panel -->
+  <rect x="680" y="224" width="200" height="155" rx="10" fill="#1E293B" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+  <text x="780" y="248" text-anchor="middle" fill="#94A3B8" font-size="9" font-weight="700" letter-spacing="1.5">RUNTIME DISPATCH</text>
+  <text x="780" y="268" text-anchor="middle" fill="#CBD5E1" font-size="11" font-weight="500">cpu_features.h</text>
+
+  <rect x="700" y="280" width="52" height="22" rx="5" fill="#1E3A5F"/>
+  <text x="726" y="295" text-anchor="middle" fill="#60A5FA" font-size="10" font-weight="700">AVX2</text>
+  <rect x="758" y="280" width="48" height="22" rx="5" fill="#1E3A5F"/>
+  <text x="782" y="295" text-anchor="middle" fill="#60A5FA" font-size="10" font-weight="700">FMA</text>
+  <rect x="812" y="280" width="52" height="22" rx="5" fill="#1E3A5F"/>
+  <text x="838" y="295" text-anchor="middle" fill="#60A5FA" font-size="10" font-weight="700">512F</text>
+  <rect x="700" y="308" width="56" height="22" rx="5" fill="#1E3A5F"/>
+  <text x="728" y="323" text-anchor="middle" fill="#60A5FA" font-size="10" font-weight="700">512VL</text>
+  <rect x="762" y="308" width="56" height="22" rx="5" fill="#1E3A5F"/>
+  <text x="790" y="323" text-anchor="middle" fill="#60A5FA" font-size="10" font-weight="700">512BW</text>
+
+  <text x="780" y="354" text-anchor="middle" fill="#475569" font-size="9">CPUID-based guards at init</text>
+  <text x="780" y="368" text-anchor="middle" fill="#475569" font-size="9">fallback → scalar kernels</text>
+
+  <!-- ═══ DATA LAYER ═══ -->
+  <rect x="40" y="418" width="860" height="110" rx="12" fill="#111318" fill-opacity="0.4" stroke="#64748B" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="62" y="439" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="2">DATA LAYER</text>
+
+  <rect x="80" y="452" width="260" height="56" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="210" y="474" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Tensor</text>
+  <text x="210" y="492" text-anchor="middle" fill="#CBD5E1" font-size="10">64-byte aligned · row-major · bounds-checked</text>
+
+  <rect x="360" y="452" width="190" height="56" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="455" y="474" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Timer</text>
+  <text x="455" y="492" text-anchor="middle" fill="#CBD5E1" font-size="10">high_resolution_clock</text>
+
+  <rect x="570" y="452" width="270" height="56" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="705" y="474" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">AlignedAllocator</text>
+  <text x="705" y="492" text-anchor="middle" fill="#CBD5E1" font-size="10">cache-line-aligned std::vector storage</text>
+
+  <!-- ═══ ARROWS ═══ -->
+  <!-- Bench → Kernel center -->
+  <line x1="470" y1="148" x2="470" y2="220" stroke="#A78BFA" stroke-width="1.5" marker-end="url(#arrowPurple)" opacity="0.6"/>
+
+  <!-- Bench → Timer (dashed side path) -->
+  <path d="M 380 148 Q 380 170 380 172 L 380 172 Q 380 180 370 180 L 458 180 Q 458 180 458 192" stroke="#94A3B8" stroke-width="1" fill="none" opacity="0.25" stroke-dasharray="4 3"/>
+
+  <!-- Kernels → Tensor -->
+  <line x1="205" y1="388" x2="205" y2="448" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.45"/>
+  <line x1="370" y1="388" x2="310" y2="448" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.45"/>
+  <line x1="545" y1="388" x2="460" y2="448" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.35" stroke-dasharray="4 3"/>
+
+  <!-- Kernels → AlignedAllocator -->
+  <line x1="375" y1="388" x2="630" y2="448" stroke="#94A3B8" stroke-width="1" marker-end="url(#arrow)" opacity="0.25" stroke-dasharray="4 3"/>
+
+  <!-- Dispatch → SIMD kernels -->
+  <line x1="680" y1="306" x2="634" y2="306" stroke="#60A5FA" stroke-width="1" marker-end="url(#arrowBlue)" opacity="0.35" stroke-dasharray="4 3"/>
+
+  <!-- Footer -->
+  <text x="470" y="552" text-anchor="middle" fill="#334155" font-size="10">C++17 · zero external dependencies · optional OpenMP · CI on GCC / Clang / MSVC</text>
+  <text x="470" y="568" text-anchor="middle" fill="#1E293B" font-size="9">github.com/shamykyzer/ml-kernel-runtime</text>
+</svg>

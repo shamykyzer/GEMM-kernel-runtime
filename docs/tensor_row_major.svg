@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 420" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="ds" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.18"/>
+    </filter>
+    <marker id="mapArrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B"/>
+    </marker>
+    <linearGradient id="row0Grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#16A34A"/>
+      <stop offset="100%" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="row1Grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="row2Grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="940" height="420" rx="16" fill="#0F172A"/>
+
+  <!-- Title -->
+  <text x="470" y="35" text-anchor="middle" fill="#F8FAFC" font-size="19" font-weight="700">Tensor — Row-Major Data Layout</text>
+  <text x="470" y="55" text-anchor="middle" fill="#475569" font-size="11">A 2D grid stored as a contiguous flat array — traversing a row is sequential in memory</text>
+
+  <!-- ═══════ LOGICAL VIEW (3×4 grid) ═══════ -->
+  <rect x="40" y="72" width="400" height="225" rx="12" fill="#111827" fill-opacity="0.4" stroke="#334155" stroke-width="1"/>
+  <text x="60" y="94" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="2">LOGICAL VIEW (3×4 GRID)</text>
+
+  <!-- Column headers -->
+  <text x="180" y="118" text-anchor="middle" fill="#64748B" font-size="10" font-weight="600">col 0</text>
+  <text x="255" y="118" text-anchor="middle" fill="#64748B" font-size="10" font-weight="600">col 1</text>
+  <text x="330" y="118" text-anchor="middle" fill="#64748B" font-size="10" font-weight="600">col 2</text>
+  <text x="405" y="118" text-anchor="middle" fill="#64748B" font-size="10" font-weight="600">col 3</text>
+
+  <!-- Row 0 (green) -->
+  <text x="100" y="148" text-anchor="middle" fill="#86EFAC" font-size="10" font-weight="700">Row 0</text>
+  <rect x="140" y="128" width="70" height="36" rx="6" fill="url(#row0Grad)" filter="url(#ds)"/>
+  <text x="175" y="151" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">1.0</text>
+  <rect x="215" y="128" width="70" height="36" rx="6" fill="url(#row0Grad)" filter="url(#ds)"/>
+  <text x="250" y="151" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">2.0</text>
+  <rect x="290" y="128" width="70" height="36" rx="6" fill="url(#row0Grad)" filter="url(#ds)"/>
+  <text x="325" y="151" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">3.0</text>
+  <rect x="365" y="128" width="70" height="36" rx="6" fill="url(#row0Grad)" filter="url(#ds)"/>
+  <text x="400" y="151" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">4.0</text>
+
+  <!-- Row 1 (orange) -->
+  <text x="100" y="191" text-anchor="middle" fill="#FCD34D" font-size="10" font-weight="700">Row 1</text>
+  <rect x="140" y="172" width="70" height="36" rx="6" fill="url(#row1Grad)" filter="url(#ds)"/>
+  <text x="175" y="195" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">5.0</text>
+  <rect x="215" y="172" width="70" height="36" rx="6" fill="url(#row1Grad)" filter="url(#ds)"/>
+  <text x="250" y="195" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">6.0</text>
+  <rect x="290" y="172" width="70" height="36" rx="6" fill="url(#row1Grad)" filter="url(#ds)"/>
+  <text x="325" y="195" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">7.0</text>
+  <rect x="365" y="172" width="70" height="36" rx="6" fill="url(#row1Grad)" filter="url(#ds)"/>
+  <text x="400" y="195" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">8.0</text>
+
+  <!-- Row 2 (blue) -->
+  <text x="100" y="235" text-anchor="middle" fill="#93C5FD" font-size="10" font-weight="700">Row 2</text>
+  <rect x="140" y="216" width="70" height="36" rx="6" fill="url(#row2Grad)" filter="url(#ds)"/>
+  <text x="175" y="239" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">9.0</text>
+  <rect x="215" y="216" width="70" height="36" rx="6" fill="url(#row2Grad)" filter="url(#ds)"/>
+  <text x="250" y="239" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">10.0</text>
+  <rect x="290" y="216" width="70" height="36" rx="6" fill="url(#row2Grad)" filter="url(#ds)"/>
+  <text x="325" y="239" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">11.0</text>
+  <rect x="365" y="216" width="70" height="36" rx="6" fill="url(#row2Grad)" filter="url(#ds)"/>
+  <text x="400" y="239" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">12.0</text>
+
+  <!-- Row scan arrow -->
+  <line x1="145" y1="270" x2="428" y2="270" stroke="#22C55E" stroke-width="1.5" marker-end="url(#mapArrow)" opacity="0.5"/>
+  <text x="290" y="285" text-anchor="middle" fill="#86EFAC" font-size="9" font-weight="600">→ row traversal = sequential memory (cache-friendly)</text>
+
+  <!-- ═══════ RIGHT PANEL: Index formula + annotations ═══════ -->
+  <rect x="480" y="72" width="430" height="225" rx="12" fill="#111827" fill-opacity="0.4" stroke="#334155" stroke-width="1"/>
+  <text x="500" y="94" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="2">INDEXING</text>
+
+  <!-- Formula box -->
+  <rect x="510" y="108" width="375" height="52" rx="10" fill="#1E293B" stroke="#7C3AED" stroke-width="1.5" filter="url(#ds)"/>
+  <text x="697" y="130" text-anchor="middle" fill="#E9D5FF" font-size="14" font-weight="700" font-family="'Consolas', 'SF Mono', monospace">index = i × cols + j</text>
+  <text x="697" y="150" text-anchor="middle" fill="#94A3B8" font-size="10">Element at row i, col j in a flat contiguous array</text>
+
+  <!-- Worked examples -->
+  <text x="510" y="185" fill="#CBD5E1" font-size="11" font-weight="700">Examples:</text>
+
+  <rect x="510" y="194" width="182" height="30" rx="5" fill="#14532D" stroke="#22C55E" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="601" y="214" text-anchor="middle" fill="#86EFAC" font-size="10" font-weight="600">[0,2] → 0×4+2 = <tspan font-weight="800">2</tspan></text>
+
+  <rect x="703" y="194" width="182" height="30" rx="5" fill="#422006" stroke="#F59E0B" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="794" y="214" text-anchor="middle" fill="#FCD34D" font-size="10" font-weight="600">[1,3] → 1×4+3 = <tspan font-weight="800">7</tspan></text>
+
+  <rect x="510" y="230" width="182" height="30" rx="5" fill="#1E3A5F" stroke="#3B82F6" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="601" y="250" text-anchor="middle" fill="#93C5FD" font-size="10" font-weight="600">[2,0] → 2×4+0 = <tspan font-weight="800">8</tspan></text>
+
+  <rect x="703" y="230" width="182" height="30" rx="5" fill="#1E293B" stroke="#64748B" stroke-width="1" stroke-opacity="0.3"/>
+  <text x="794" y="250" text-anchor="middle" fill="#CBD5E1" font-size="10" font-weight="600">[2,3] → 2×4+3 = <tspan font-weight="800">11</tspan></text>
+
+  <!-- Access pattern notes -->
+  <text x="510" y="280" fill="#94A3B8" font-size="10" font-weight="600">Memory access implications:</text>
+  <text x="518" y="296" fill="#86EFAC" font-size="10">✓ Row traversal: stride 1 → cache line reuse</text>
+
+  <!-- ═══════ FLAT MEMORY LAYOUT (bottom) ═══════ -->
+  <rect x="40" y="312" width="870" height="96" rx="12" fill="#111827" fill-opacity="0.4" stroke="#334155" stroke-width="1"/>
+  <text x="60" y="334" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="2">MEMORY LAYOUT (FLAT ARRAY)</text>
+
+  <!-- Memory cells — 12 cells, color-coded by row origin -->
+  <g transform="translate(60, 344)">
+    <!-- Row 0 cells (green) -->
+    <rect x="0" y="0" width="62" height="40" rx="5" fill="url(#row0Grad)"/>
+    <text x="31" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">1.0</text>
+    <text x="31" y="34" text-anchor="middle" fill="#DCFCE7" font-size="8">[0]</text>
+
+    <rect x="66" y="0" width="62" height="40" rx="5" fill="url(#row0Grad)"/>
+    <text x="97" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">2.0</text>
+    <text x="97" y="34" text-anchor="middle" fill="#DCFCE7" font-size="8">[1]</text>
+
+    <rect x="132" y="0" width="62" height="40" rx="5" fill="url(#row0Grad)"/>
+    <text x="163" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">3.0</text>
+    <text x="163" y="34" text-anchor="middle" fill="#DCFCE7" font-size="8">[2]</text>
+
+    <rect x="198" y="0" width="62" height="40" rx="5" fill="url(#row0Grad)"/>
+    <text x="229" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">4.0</text>
+    <text x="229" y="34" text-anchor="middle" fill="#DCFCE7" font-size="8">[3]</text>
+
+    <!-- Row 1 cells (orange) -->
+    <rect x="264" y="0" width="62" height="40" rx="5" fill="url(#row1Grad)"/>
+    <text x="295" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">5.0</text>
+    <text x="295" y="34" text-anchor="middle" fill="#FEF3C7" font-size="8">[4]</text>
+
+    <rect x="330" y="0" width="62" height="40" rx="5" fill="url(#row1Grad)"/>
+    <text x="361" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">6.0</text>
+    <text x="361" y="34" text-anchor="middle" fill="#FEF3C7" font-size="8">[5]</text>
+
+    <rect x="396" y="0" width="62" height="40" rx="5" fill="url(#row1Grad)"/>
+    <text x="427" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">7.0</text>
+    <text x="427" y="34" text-anchor="middle" fill="#FEF3C7" font-size="8">[6]</text>
+
+    <rect x="462" y="0" width="62" height="40" rx="5" fill="url(#row1Grad)"/>
+    <text x="493" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">8.0</text>
+    <text x="493" y="34" text-anchor="middle" fill="#FEF3C7" font-size="8">[7]</text>
+
+    <!-- Row 2 cells (blue) -->
+    <rect x="528" y="0" width="62" height="40" rx="5" fill="url(#row2Grad)"/>
+    <text x="559" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">9.0</text>
+    <text x="559" y="34" text-anchor="middle" fill="#DBEAFE" font-size="8">[8]</text>
+
+    <rect x="594" y="0" width="62" height="40" rx="5" fill="url(#row2Grad)"/>
+    <text x="625" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">10.0</text>
+    <text x="625" y="34" text-anchor="middle" fill="#DBEAFE" font-size="8">[9]</text>
+
+    <rect x="660" y="0" width="62" height="40" rx="5" fill="url(#row2Grad)"/>
+    <text x="691" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">11.0</text>
+    <text x="691" y="34" text-anchor="middle" fill="#DBEAFE" font-size="8">[10]</text>
+
+    <rect x="726" y="0" width="62" height="40" rx="5" fill="url(#row2Grad)"/>
+    <text x="757" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">12.0</text>
+    <text x="757" y="34" text-anchor="middle" fill="#DBEAFE" font-size="8">[11]</text>
+
+    <!-- Memory address arrow -->
+    <line x1="0" y1="48" x2="788" y2="48" stroke="#475569" stroke-width="1"/>
+    <text x="394" y="58" text-anchor="middle" fill="#475569" font-size="9">contiguous memory addresses →   (64-byte aligned)</text>
+  </g>
+</svg>

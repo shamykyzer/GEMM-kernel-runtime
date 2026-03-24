@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 540" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="ms" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <rect width="940" height="540" rx="16" fill="#0F172A"/>
+
+  <!-- Title -->
+  <text x="470" y="35" text-anchor="middle" fill="#F8FAFC" font-size="19" font-weight="700">SIMD Micro-Kernel Register Tiling</text>
+  <text x="470" y="54" text-anchor="middle" fill="#475569" font-size="11">Outer loop over k; inner loop broadcasts A elements, FMA-accumulates into C registers</text>
+
+  <!-- ════════════════ AVX2 Section (left) ════════════════ -->
+  <rect x="20" y="68" width="435" height="410" rx="12" fill="#111827" fill-opacity="0.3" stroke="#7C3AED" stroke-width="1" stroke-opacity="0.25"/>
+
+  <text x="237" y="92" text-anchor="middle" fill="#60A5FA" font-size="16" font-weight="700">AVX2 + FMA</text>
+  <rect x="170" y="98" width="135" height="18" rx="4" fill="#1E3A5F"/>
+  <text x="237" y="112" text-anchor="middle" fill="#93C5FD" font-size="10" font-weight="600">4×8 micro-kernel · 256-bit YMM</text>
+
+  <!-- A column (4 rows, broadcast) -->
+  <text x="56" y="140" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">A col k</text>
+  <g transform="translate(36, 148)">
+    <rect width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₀ₖ</text>
+    <rect y="34" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="54" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₁ₖ</text>
+    <rect y="68" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="88" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₂ₖ</text>
+    <rect y="102" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="122" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₃ₖ</text>
+  </g>
+  <text x="56" y="295" text-anchor="middle" fill="#FCA5A5" font-size="9" font-weight="600">_mm256_set1_ps</text>
+  <text x="56" y="307" text-anchor="middle" fill="#FCA5A5" font-size="9">(broadcast each)</text>
+
+  <!-- × symbol -->
+  <text x="90" y="215" fill="#475569" font-size="22" font-weight="300">×</text>
+
+  <!-- B row (8 wide = 1 YMM load) -->
+  <text x="260" y="140" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">B row k — 8 floats = 1 YMM load</text>
+  <g transform="translate(105, 148)">
+    <rect width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="19" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₀</text>
+    <rect x="40" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="59" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₁</text>
+    <rect x="80" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="99" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₂</text>
+    <rect x="120" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="139" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₃</text>
+    <rect x="160" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="179" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₄</text>
+    <rect x="200" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="219" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₅</text>
+    <rect x="240" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="259" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₆</text>
+    <rect x="280" width="38" height="30" rx="4" fill="#2563EB"/>
+    <text x="299" y="20" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">bₖ₇</text>
+  </g>
+
+  <!-- = symbol -->
+  <text x="90" y="355" fill="#475569" font-size="20" font-weight="300">=</text>
+
+  <!-- C accumulator (4 YMM registers) -->
+  <text x="260" y="322" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">C accumulator — 4 YMM registers</text>
+  <g transform="translate(105, 332)">
+    <rect width="318" height="26" rx="4" fill="#7C3AED" opacity="0.8"/>
+    <text x="159" y="18" text-anchor="middle" fill="#E9D5FF" font-size="9" font-weight="700">c₀[0..7] += a₀ₖ × bₖ[0..7]     YMM0 ← _mm256_fmadd_ps</text>
+    <rect y="30" width="318" height="26" rx="4" fill="#7C3AED" opacity="0.7"/>
+    <text x="159" y="48" text-anchor="middle" fill="#E9D5FF" font-size="9" font-weight="700">c₁[0..7] += a₁ₖ × bₖ[0..7]     YMM1 ← _mm256_fmadd_ps</text>
+    <rect y="60" width="318" height="26" rx="4" fill="#7C3AED" opacity="0.6"/>
+    <text x="159" y="78" text-anchor="middle" fill="#E9D5FF" font-size="9" font-weight="700">c₂[0..7] += a₂ₖ × bₖ[0..7]     YMM2 ← _mm256_fmadd_ps</text>
+    <rect y="90" width="318" height="26" rx="4" fill="#7C3AED" opacity="0.5"/>
+    <text x="159" y="108" text-anchor="middle" fill="#E9D5FF" font-size="9" font-weight="700">c₃[0..7] += a₃ₖ × bₖ[0..7]     YMM3 ← _mm256_fmadd_ps</text>
+  </g>
+
+  <!-- AVX2 stats -->
+  <rect x="48" y="458" width="370" height="32" rx="8" fill="#1E293B" stroke="#7C3AED" stroke-width="1"/>
+  <text x="233" y="479" text-anchor="middle" fill="#C4B5FD" font-size="11" font-weight="700">4 FMA ops/k-step = 64 FLOPs · Prefetch: _MM_HINT_T0</text>
+
+  <!-- ════════════════ Divider ════════════════ -->
+  <line x1="470" y1="82" x2="470" y2="498" stroke="#334155" stroke-width="1" stroke-dasharray="6 4"/>
+
+  <!-- ════════════════ AVX-512 Section (right) ════════════════ -->
+  <rect x="485" y="68" width="435" height="410" rx="12" fill="#0C2A30" fill-opacity="0.3" stroke="#0E7490" stroke-width="1" stroke-opacity="0.25"/>
+
+  <text x="702" y="92" text-anchor="middle" fill="#38BDF8" font-size="16" font-weight="700">AVX-512</text>
+  <rect x="628" y="98" width="148" height="18" rx="4" fill="#083344"/>
+  <text x="702" y="112" text-anchor="middle" fill="#67E8F9" font-size="10" font-weight="600">4×16 micro-kernel · 512-bit ZMM</text>
+
+  <!-- A column (4 rows, broadcast) -->
+  <text x="520" y="140" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">A col k</text>
+  <g transform="translate(500, 148)">
+    <rect width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₀ₖ</text>
+    <rect y="34" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="54" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₁ₖ</text>
+    <rect y="68" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="88" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₂ₖ</text>
+    <rect y="102" width="40" height="30" rx="4" fill="#DC2626"/>
+    <text x="20" y="122" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">a₃ₖ</text>
+  </g>
+  <text x="520" y="295" text-anchor="middle" fill="#FCA5A5" font-size="9" font-weight="600">_mm512_set1_ps</text>
+
+  <!-- × symbol -->
+  <text x="555" y="215" fill="#475569" font-size="22" font-weight="300">×</text>
+
+  <!-- B row (16 wide = 1 ZMM load) -->
+  <text x="730" y="140" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">B row k — 16 floats = 1 ZMM load</text>
+  <g transform="translate(572, 148)">
+    <!-- 14 solid + 2 masked -->
+    <rect width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="24" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="48" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="72" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="96" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="120" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="144" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="168" width="22" height="30" rx="3" fill="#0284C7"/>
+    <rect x="192" width="22" height="30" rx="3" fill="#0369A1"/>
+    <rect x="216" width="22" height="30" rx="3" fill="#0369A1"/>
+    <rect x="240" width="22" height="30" rx="3" fill="#0369A1"/>
+    <rect x="264" width="22" height="30" rx="3" fill="#0369A1"/>
+    <rect x="288" width="22" height="30" rx="3" fill="#0369A1"/>
+    <rect x="312" width="22" height="30" rx="3" fill="#0369A1"/>
+    <!-- Masked remainder -->
+    <rect x="336" width="22" height="30" rx="3" fill="#0C4A6E" stroke="#38BDF8" stroke-width="1" stroke-dasharray="2 1"/>
+    <rect x="360" width="22" height="30" rx="3" fill="#0C4A6E" stroke="#38BDF8" stroke-width="1" stroke-dasharray="2 1"/>
+    <text x="192" y="50" text-anchor="middle" fill="#7DD3FC" font-size="8" font-weight="600">16 floats per ZMM register</text>
+    <text x="348" y="50" text-anchor="middle" fill="#38BDF8" font-size="8">mask</text>
+  </g>
+
+  <!-- = symbol -->
+  <text x="555" y="355" fill="#475569" font-size="20" font-weight="300">=</text>
+
+  <!-- C accumulator (4 ZMM registers) -->
+  <text x="730" y="322" text-anchor="middle" fill="#94A3B8" font-size="10" font-weight="700">C accumulator — 4 ZMM registers</text>
+  <g transform="translate(558, 332)">
+    <rect width="365" height="26" rx="4" fill="#0E7490" opacity="0.8"/>
+    <text x="182" y="18" text-anchor="middle" fill="#CFFAFE" font-size="9" font-weight="700">c₀[0..15] += a₀ₖ × bₖ[0..15]    ZMM0 ← _mm512_fmadd_ps</text>
+    <rect y="30" width="365" height="26" rx="4" fill="#0E7490" opacity="0.7"/>
+    <text x="182" y="48" text-anchor="middle" fill="#CFFAFE" font-size="9" font-weight="700">c₁[0..15] += a₁ₖ × bₖ[0..15]    ZMM1 ← _mm512_fmadd_ps</text>
+    <rect y="60" width="365" height="26" rx="4" fill="#0E7490" opacity="0.6"/>
+    <text x="182" y="78" text-anchor="middle" fill="#CFFAFE" font-size="9" font-weight="700">c₂[0..15] += a₂ₖ × bₖ[0..15]    ZMM2 ← _mm512_fmadd_ps</text>
+    <rect y="90" width="365" height="26" rx="4" fill="#0E7490" opacity="0.5"/>
+    <text x="182" y="108" text-anchor="middle" fill="#CFFAFE" font-size="9" font-weight="700">c₃[0..15] += a₃ₖ × bₖ[0..15]    ZMM3 ← _mm512_fmadd_ps</text>
+  </g>
+
+  <!-- AVX-512 stats -->
+  <rect x="515" y="458" width="378" height="32" rx="8" fill="#1E293B" stroke="#0E7490" stroke-width="1"/>
+  <text x="704" y="479" text-anchor="middle" fill="#67E8F9" font-size="11" font-weight="700">4 FMA ops/k-step = 128 FLOPs (2× AVX2) · __mmask16 edges</text>
+
+  <!-- ════════════════ Bottom comparison ════════════════ -->
+  <rect x="180" y="502" width="580" height="28" rx="8" fill="#1E293B" stroke="#334155"/>
+  <text x="470" y="521" text-anchor="middle" fill="#94A3B8" font-size="10">
+    <tspan fill="#C4B5FD" font-weight="700">AVX2:</tspan> 8 floats/reg · 64 FLOPs/step
+    <tspan fill="#475569">  │  </tspan>
+    <tspan fill="#67E8F9" font-weight="700">AVX-512:</tspan> 16 floats/reg · 128 FLOPs/step
+    <tspan fill="#475569">  │  </tspan>
+    <tspan fill="#94A3B8">Runtime CPUID dispatch</tspan>
+  </text>
+</svg>

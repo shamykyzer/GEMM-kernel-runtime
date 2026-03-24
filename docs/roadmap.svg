@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 400" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <filter id="rs" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+    <linearGradient id="doneGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#16A34A"/>
+      <stop offset="100%" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="nextGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="futureGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#64748B"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="940" height="400" rx="16" fill="#0F172A"/>
+
+  <!-- Title -->
+  <text x="470" y="32" text-anchor="middle" fill="#F8FAFC" font-size="19" font-weight="700">Project Roadmap</text>
+  <text x="470" y="50" text-anchor="middle" fill="#475569" font-size="11">Progressive optimization from naive GEMM to parallel SIMD — with softmax on the horizon</text>
+
+  <!-- Legend -->
+  <g transform="translate(310, 60)">
+    <rect width="12" height="12" rx="3" fill="#22C55E"/>
+    <text x="17" y="11" fill="#86EFAC" font-size="10" font-weight="600">Complete</text>
+    <rect x="100" width="12" height="12" rx="3" fill="#3B82F6"/>
+    <text x="117" y="11" fill="#93C5FD" font-size="10" font-weight="600">Next up</text>
+    <rect x="188" width="12" height="12" rx="3" fill="#64748B"/>
+    <text x="205" y="11" fill="#94A3B8" font-size="10" font-weight="600">Planned</text>
+  </g>
+
+  <!-- ═══ Timeline axis ═══ -->
+  <line x1="42" y1="195" x2="898" y2="195" stroke="#334155" stroke-width="2"/>
+  <!-- Progress glow on completed portion -->
+  <line x1="42" y1="195" x2="652" y2="195" stroke="#22C55E" stroke-width="2" opacity="0.3"/>
+
+  <!-- ═══ GEMM TRACK (above timeline) ═══ -->
+  <text x="42" y="100" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="1.5">GEMM TRACK</text>
+
+  <!-- P1 — Bootstrap -->
+  <rect x="42" y="110" width="85" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="84" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="84" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P1</text>
+  <text x="84" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">CMake</text>
+  <text x="84" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">Bootstrap</text>
+
+  <!-- P2 — Tensor -->
+  <rect x="137" y="110" width="85" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="179" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="179" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P2</text>
+  <text x="179" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">Tensor</text>
+  <text x="179" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">Class</text>
+
+  <!-- P3 — Naive GEMM -->
+  <rect x="232" y="110" width="85" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="274" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="274" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P3</text>
+  <text x="274" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">Naive</text>
+  <text x="274" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">GEMM</text>
+
+  <!-- P4 — Benchmark -->
+  <rect x="327" y="110" width="85" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="369" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="369" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P4</text>
+  <text x="369" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">Benchmark</text>
+  <text x="369" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">Harness</text>
+
+  <!-- P5 — Tiled GEMM -->
+  <rect x="422" y="110" width="85" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="464" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="464" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P5</text>
+  <text x="464" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">Tiled</text>
+  <text x="464" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">GEMM</text>
+
+  <!-- P6 — Parallel + SIMD -->
+  <rect x="517" y="110" width="105" height="62" rx="7" fill="url(#doneGrad)" filter="url(#rs)"/>
+  <circle cx="569" cy="195" r="7" fill="#22C55E" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="569" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P6</text>
+  <text x="569" y="144" text-anchor="middle" fill="#DCFCE7" font-size="8">Parallel</text>
+  <text x="569" y="155" text-anchor="middle" fill="#DCFCE7" font-size="8">+ SIMD</text>
+
+  <!-- P7 — TileTask (next) -->
+  <rect x="642" y="110" width="95" height="62" rx="7" fill="url(#nextGrad)" filter="url(#rs)"/>
+  <circle cx="689" cy="195" r="9" fill="#3B82F6" stroke="#0F172A" stroke-width="2.5"/>
+  <circle cx="689" cy="195" r="4" fill="#BFDBFE"/>
+  <text x="689" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P7</text>
+  <text x="689" y="144" text-anchor="middle" fill="#DBEAFE" font-size="8">TileTask</text>
+  <text x="689" y="155" text-anchor="middle" fill="#DBEAFE" font-size="8">Abstraction</text>
+
+  <!-- P8 — Scheduler (next) -->
+  <rect x="747" y="110" width="95" height="62" rx="7" fill="url(#nextGrad)" filter="url(#rs)"/>
+  <circle cx="794" cy="195" r="7" fill="#3B82F6" stroke="#0F172A" stroke-width="2.5"/>
+  <text x="794" y="130" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">P8</text>
+  <text x="794" y="144" text-anchor="middle" fill="#DBEAFE" font-size="8">Scheduler</text>
+  <text x="794" y="155" text-anchor="middle" fill="#DBEAFE" font-size="8">Layer</text>
+
+  <!-- ═══ SOFTMAX TRACK (below timeline) ═══ -->
+  <text x="42" y="228" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="1.5">SOFTMAX TRACK</text>
+
+  <!-- P11 — Naive Softmax -->
+  <rect x="327" y="240" width="115" height="52" rx="7" fill="url(#futureGrad)" filter="url(#rs)" opacity="0.75"/>
+  <circle cx="384" cy="195" r="5" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <text x="384" y="261" text-anchor="middle" fill="#E2E8F0" font-size="10" font-weight="800">P11</text>
+  <text x="384" y="278" text-anchor="middle" fill="#CBD5E1" font-size="9">Naive Softmax</text>
+
+  <!-- P12 — Tiled + Online -->
+  <rect x="457" y="240" width="115" height="52" rx="7" fill="url(#futureGrad)" filter="url(#rs)" opacity="0.75"/>
+  <circle cx="514" cy="195" r="5" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <text x="514" y="261" text-anchor="middle" fill="#E2E8F0" font-size="10" font-weight="800">P12</text>
+  <text x="514" y="278" text-anchor="middle" fill="#CBD5E1" font-size="9">Tiled + Online</text>
+
+  <!-- P13 — Parallel Softmax -->
+  <rect x="587" y="240" width="115" height="52" rx="7" fill="url(#futureGrad)" filter="url(#rs)" opacity="0.75"/>
+  <circle cx="644" cy="195" r="5" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <text x="644" y="261" text-anchor="middle" fill="#E2E8F0" font-size="10" font-weight="800">P13</text>
+  <text x="644" y="278" text-anchor="middle" fill="#CBD5E1" font-size="9">Parallel Softmax</text>
+
+  <!-- P14 — Softmax Bench -->
+  <rect x="717" y="240" width="125" height="52" rx="7" fill="url(#futureGrad)" filter="url(#rs)" opacity="0.75"/>
+  <circle cx="779" cy="195" r="5" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <text x="779" y="261" text-anchor="middle" fill="#E2E8F0" font-size="10" font-weight="800">P14</text>
+  <text x="779" y="278" text-anchor="middle" fill="#CBD5E1" font-size="9">Softmax Bench</text>
+
+  <!-- ═══ INFRA TRACK (bottom) ═══ -->
+  <text x="42" y="325" fill="#94A3B8" font-size="10" font-weight="700" letter-spacing="1.5">INFRASTRUCTURE</text>
+
+  <!-- P9 — Tests -->
+  <rect x="137" y="338" width="130" height="38" rx="7" fill="url(#nextGrad)" filter="url(#rs)" opacity="0.85"/>
+  <text x="202" y="362" text-anchor="middle" fill="#DBEAFE" font-size="10" font-weight="700">P9 — Full Test Suite</text>
+
+  <!-- P10 — Docs -->
+  <rect x="282" y="338" width="190" height="38" rx="7" fill="url(#futureGrad)" filter="url(#rs)" opacity="0.75"/>
+  <text x="377" y="362" text-anchor="middle" fill="#CBD5E1" font-size="10" font-weight="700">P10 — Docs + perf stat</text>
+
+  <!-- Connecting lines from infra to timeline -->
+  <line x1="202" y1="338" x2="202" y2="200" stroke="#3B82F6" stroke-width="1" opacity="0.2" stroke-dasharray="3 3"/>
+  <line x1="377" y1="338" x2="377" y2="200" stroke="#64748B" stroke-width="1" opacity="0.15" stroke-dasharray="3 3"/>
+
+  <!-- Progress label -->
+  <rect x="42" y="385" width="130" height="10" rx="3" fill="#22C55E" opacity="0.15"/>
+  <rect x="42" y="385" width="82" height="10" rx="3" fill="#22C55E" opacity="0.35"/>
+  <text x="178" y="394" fill="#64748B" font-size="9">6 of 14 phases complete</text>
+</svg>
