@@ -6,14 +6,14 @@ I built this project inspired by how ML accelerator runtimes (Graphcore Poplibs,
 
 ```
 === N=1024 ===
-  naive                          5685.89 ms      0.38 GFLOPS   (baseline)
-  tiled  bs=16                    649.98 ms      3.30 GFLOPS      8.7x
-  parallel  bs=16  t=14           119.75 ms     17.93 GFLOPS     47.5x
-  avx2+fma  bs=16                  51.76 ms     41.49 GFLOPS    109.9x
-  avx-512   bs=48                  28.26 ms     75.98 GFLOPS    201.2x
-  std-simd  bs=16                  85.53 ms     25.11 GFLOPS     66.5x
-  parallel+simd  bs=128  t=18      8.92 ms    240.83 GFLOPS    637.6x
-  parallel+avx512  bs=64  t=18     5.17 ms    415.56 GFLOPS   1100.3x
+  naive                          5620.50 ms      0.38 GFLOPS   (baseline)
+  tiled  bs=16                    645.59 ms      3.33 GFLOPS      8.7x
+  parallel  bs=16  t=16           116.61 ms     18.42 GFLOPS     48.2x
+  avx2+fma  bs=16                  58.31 ms     36.83 GFLOPS     96.4x
+  avx-512   bs=48                  31.50 ms     68.18 GFLOPS    178.4x
+  std-simd  bs=16                  96.88 ms     22.17 GFLOPS     58.0x
+  parallel+simd  bs=64  t=18       8.37 ms    256.61 GFLOPS    671.6x
+  parallel+avx512  bs=64  t=18     4.88 ms    439.78 GFLOPS   1151.0x
 ```
 
 > Run `make bench` to see actual numbers on your hardware.
@@ -106,7 +106,7 @@ make clean    # remove build directory
 | `gemm_avx512` | Tiled + AVX-512 4x16 micro-kernel + masked edges | AVX-512 (16-wide) | 1 | ~201x |
 | `gemm_simd` | Tiled + std::experimental::simd (portable) | native_simd | 1 | ~67x |
 | `gemm_parallel_simd` | OpenMP parallel tiles + AVX2 inner loop | AVX2 (8-wide) | 18 | ~638x |
-| `gemm_parallel_avx512` | OpenMP parallel tiles + AVX-512 inner loop + masked edges | AVX-512 (16-wide) | 18 | ~1100x |
+| `gemm_parallel_avx512` | OpenMP parallel tiles + AVX-512 inner loop + masked edges | AVX-512 (16-wide) | 18 | ~1151x |
 
 ### SIMD Micro-Kernel Register Tiling
 
@@ -120,13 +120,13 @@ I distribute output tiles across CPU cores via OpenMP. Each thread owns distinct
 
 At small matrix sizes (N=128), I found that thread overhead dominates and adding more threads actually hurts.
 
-At large N (1024+), my parallel+AVX-512 kernel peaks at **416 GFLOPS with 18 threads**, not 20, despite having 20 hardware threads (10 cores x 2 SMT).
+At large N (1024+), my parallel+AVX-512 kernel peaks at **440 GFLOPS with 18 threads**, not 20, despite having 20 hardware threads (10 cores x 2 SMT).
 
 **Why 18 threads outperforms 20, a hypothesis:**
 
 My CPU has 10 physical cores with 2 SMT threads each (20 logical threads). Each physical core shares a single set of AVX-512 execution units and a 48KB L1d cache between its two SMT threads.
 
-I hypothesize that the performance drop at 20 threads (256 GFLOPS vs 416 at 18) is caused by full SMT saturation. At 18 threads, 2 cores run only 1 thread each, leaving scheduling headroom and reducing contention for shared resources. At 20 threads, both SMT threads on every core compete for the same 512-bit FMA units and L1 cache lines.
+I hypothesize that the performance drop at 20 threads (381 GFLOPS vs 440 at 18) is caused by partial SMT saturation. At 18 threads, 2 cores run only 1 thread each, leaving scheduling headroom and reducing contention for shared resources. At 20 threads, both SMT threads on every core compete for the same 512-bit FMA units and L1 cache lines.
 
 **Cache pressure:**
 
@@ -263,7 +263,7 @@ Thread 2: tile(2,0) → AVX-512 4x16 micro-kernel + masked edges
 
 This exploits both instruction-level parallelism (16-wide SIMD) and thread-level parallelism (OpenMP) simultaneously.
 
-The 2x wider registers over AVX2, combined with masked operations for edge cases, delivers ~2x throughput per thread. This scales to 416 GFLOPS at 18 threads, a 1100x speedup over my naive baseline.
+The 2x wider registers over AVX2, combined with masked operations for edge cases, delivers ~2x throughput per thread. This scales to 440 GFLOPS at 18 threads, a 1151x speedup over my naive baseline.
 
 ### Benchmark Methodology
 
@@ -304,9 +304,9 @@ The theoretical peak is `10 cores x 32 FLOPS/cycle x f GHz`, but the sustained a
 | Metric | Value | Notes |
 |--------|-------|-------|
 | Theoretical single-core peak | ~128 to 160 GFLOPS | At 4.0 to 5.0 GHz (boost varies) |
-| Measured single-core AVX-512 | 75.98 GFLOPS | 48 to 59% of theoretical |
+| Measured single-core AVX-512 | 68.18 GFLOPS | 43 to 53% of theoretical |
 | Theoretical 10-core peak | ~960 to 1,600 GFLOPS | At 3.0 to 5.0 GHz (unknown sustained) |
-| Measured 18-thread peak | 415.56 GFLOPS | 26 to 43% of theoretical |
+| Measured 18-thread peak | 439.78 GFLOPS | 27 to 46% of theoretical |
 
 The gap between measured and theoretical throughput is expected for a kernel without multi-level cache blocking.
 
@@ -324,7 +324,7 @@ I designed this project as an educational exploration of GEMM optimization techn
   All kernels operate on `float` (32-bit). I have not implemented double-precision, half-precision, or integer quantized (INT8/BF16) variants.
 
 - **No comparison to production BLAS.**
-  I have not benchmarked against OpenBLAS, Intel MKL, or BLIS. My 416 GFLOPS is measured against my own naive baseline. Production libraries on this hardware would likely achieve significantly higher throughput through multi-level cache blocking, panel packing, and microarchitecture-specific tuning.
+  I have not benchmarked against OpenBLAS, Intel MKL, or BLIS. My 440 GFLOPS is measured against my own naive baseline. Production libraries on this hardware would likely achieve significantly higher throughput through multi-level cache blocking, panel packing, and microarchitecture-specific tuning.
 
 - **Square matrices only in benchmarks.**
   My kernels handle arbitrary MxKxN dimensions (validated in `test_gemm.cpp`), but I only benchmark square NxN matrices. Real workloads involve rectangular shapes where tiling efficiency and edge-handling costs differ.
