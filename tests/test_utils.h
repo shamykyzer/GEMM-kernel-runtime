@@ -28,17 +28,30 @@ static int g_test_failures = 0;
 
 constexpr float TEST_TOLERANCE = 1e-4f;
 
+// True when a and b are both finite and differ by at most `tolerance`,
+// measured relative to the larger magnitude (absolute for values below 1).
+//
+// NaN and infinity never count as near, not even to themselves. Every ordered
+// comparison with NaN is false, so the result has to be phrased as "finite and
+// within tolerance". Phrasing it as "not too far apart" lets NaN through, and
+// a kernel that produced NaN would then pass every test.
+inline bool nearly_equal(float a, float b, float tolerance = TEST_TOLERANCE) {
+    if (!std::isfinite(a) || !std::isfinite(b)) {
+        return false;
+    }
+    const float diff = std::fabs(a - b);
+    const float scale = std::fmax(1.0f, std::fmax(std::fabs(a), std::fabs(b)));
+    return diff <= tolerance * scale;
+}
+
 #define ASSERT_NEAR(a, b)                                                  \
     do {                                                                   \
         float _a = (a), _b = (b);                                         \
-        float _diff = std::fabs(_a - _b);                                  \
-        float _scale = std::fmax(1.0f, std::fmax(std::fabs(_a),            \
-                                                  std::fabs(_b)));         \
-        if (_diff / _scale > TEST_TOLERANCE) {                             \
+        if (!nearly_equal(_a, _b)) {                                       \
             std::cerr << "FAIL: " << __FILE__ << ":" << __LINE__           \
                       << "  " #a " ~= " #b << "  (" << _a                 \
-                      << " vs " << _b << ", diff=" << _diff << ")"         \
-                      << std::endl;                                        \
+                      << " vs " << _b << ", diff="                         \
+                      << std::fabs(_a - _b) << ")" << std::endl;           \
             ++g_test_failures;                                             \
         }                                                                  \
     } while (0)
