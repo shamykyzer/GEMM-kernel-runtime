@@ -20,17 +20,16 @@ set(TILE_CORE_SOURCES
   src/runtime_placeholder.cpp
   src/tensor.cpp
   src/gemm_naive.cpp
-  src/gemm_tiled.cpp
-  src/gemm_parallel.cpp
-  src/gemm_avx.cpp
-  src/gemm_avx512.cpp
-  src/gemm_parallel_simd.cpp
-  src/gemm_parallel_avx512.cpp
+  src/gemm.cpp
+  src/tile_driver.cpp
+  src/tile_kernel_scalar.cpp
+  src/tile_kernel_avx2.cpp
+  src/tile_kernel_avx512.cpp
 )
 
 # std::experimental::simd is only available on GCC (libstdc++)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  list(APPEND TILE_CORE_SOURCES src/gemm_simd.cpp)
+  list(APPEND TILE_CORE_SOURCES src/tile_kernel_stdsimd.cpp)
 endif()
 
 add_library(tile_runtime_core STATIC ${TILE_CORE_SOURCES})
@@ -40,23 +39,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  set_source_files_properties(src/gemm_avx.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
-  set_source_files_properties(src/gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
-  set_source_files_properties(src/gemm_parallel_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
-  set_source_files_properties(src/gemm_parallel_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
+  set_source_files_properties(src/tile_kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+  set_source_files_properties(src/tile_kernel_avx512.cpp PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512vl -mfma")
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set_source_files_properties(src/gemm_simd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
+    set_source_files_properties(src/tile_kernel_stdsimd.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
   endif()
 elseif(MSVC)
-  set_source_files_properties(src/gemm_avx.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
-  set_source_files_properties(src/gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX512")
-  set_source_files_properties(src/gemm_parallel_simd.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
-  set_source_files_properties(src/gemm_parallel_avx512.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX512")
+  set_source_files_properties(src/tile_kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+  set_source_files_properties(src/tile_kernel_avx512.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX512")
 endif()
 
 target_include_directories(tile_runtime_core
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 if(OpenMP_CXX_FOUND)
