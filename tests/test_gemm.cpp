@@ -491,6 +491,50 @@ void test_naive_overwrites_previous_output() {
 // Parallel kernels
 // ---------------------------------------------------------------------------
 
+// Each pair executes the same tile kernel on the same tiles, so scheduling
+// must leave every output value exactly equal to the serial result.
+void test_parallel_kernels_match_their_serial_twin() {
+    struct KernelPair { Kernel serial, parallel; };
+    const KernelPair pairs[] = {
+        {gemm_tiled, gemm_parallel},
+        {gemm_avx, gemm_parallel_simd},
+        {gemm_avx512, gemm_parallel_avx512},
+    };
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {40, 19, 72, 8}, {37, 53, 71, 16}, {9, 17, 33, 4}, {129, 65, 130, 64},
+    };
+
+    const auto& kernels = all_kernels();
+    const auto find_kernel = [&kernels](Kernel run) {
+        return std::find_if(kernels.begin(), kernels.end(),
+                            [run](const KernelCase& kernel) { return kernel.run == run; });
+    };
+
+    unsigned seed = 7000;
+    for (const KernelPair& pair : pairs) {
+        const auto serial = find_kernel(pair.serial);
+        const auto parallel = find_kernel(pair.parallel);
+        ASSERT_TRUE(serial != kernels.end() && parallel != kernels.end());
+        if (serial == kernels.end() || parallel == kernels.end() ||
+            !serial->supported || !parallel->supported) {
+            continue;
+        }
+
+        const std::string what = std::string("against ") + serial->name;
+        for (const Shape& shape : shapes) {
+            Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+            A.randomize(seed++);
+            B.randomize(seed++);
+
+            Tensor serial_result(shape.M, shape.N), parallel_result(shape.M, shape.N);
+            serial->run(A, B, serial_result, shape.block_size);
+            parallel->run(A, B, parallel_result, shape.block_size);
+            expect_exact(*parallel, shape.block_size, what.c_str(), parallel_result, serial_result);
+        }
+    }
+}
+
 #ifdef _OPENMP
 // Each output tile is computed by exactly one thread, so a parallel kernel
 // must give the same values whatever the thread count. The three shapes split
@@ -554,8 +598,9 @@ int main() {
     RUN_TEST(test_shape_mismatch_throws);
     RUN_TEST(test_naive_overwrites_previous_output);
 
-#ifdef _OPENMP
     std::cout << "test_gemm (parallel kernels):" << std::endl;
+    RUN_TEST(test_parallel_kernels_match_their_serial_twin);
+#ifdef _OPENMP
     RUN_TEST(test_parallel_kernels_ignore_thread_count);
 #endif
 
