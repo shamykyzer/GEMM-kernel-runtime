@@ -17,7 +17,6 @@ endif()
 find_package(OpenMP QUIET)
 
 set(TILE_CORE_SOURCES
-  src/runtime_placeholder.cpp
   src/tensor.cpp
   src/gemm_naive.cpp
   src/gemm_tiled.cpp
@@ -68,11 +67,6 @@ add_executable(benchmark_gemm
 )
 target_link_libraries(benchmark_gemm PRIVATE tile_runtime_core)
 
-add_executable(test_runtime
-  tests/test_runtime.cpp
-)
-target_link_libraries(test_runtime PRIVATE tile_runtime_core)
-
 add_executable(test_tensor
   tests/test_tensor.cpp
 )
@@ -84,6 +78,5 @@ add_executable(test_gemm
 target_link_libraries(test_gemm PRIVATE tile_runtime_core)
 
 enable_testing()
-add_test(NAME runtime_smoke_test COMMAND test_runtime)
 add_test(NAME tensor_tests COMMAND test_tensor)
 add_test(NAME gemm_tests COMMAND test_gemm)
