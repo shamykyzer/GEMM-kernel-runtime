@@ -80,13 +80,12 @@ make clean    # remove build directory
 ├── src/
 │   ├── tensor.cpp                # Tensor implementation
 │   ├── gemm_naive.cpp            # naive GEMM kernel
-│   ├── gemm_tiled.cpp            # tiled GEMM kernel
-│   ├── gemm_parallel.cpp         # OpenMP parallel GEMM kernel
-│   ├── gemm_avx.cpp              # AVX2+FMA GEMM (4x8 micro-kernel)
-│   ├── gemm_avx512.cpp           # AVX-512 GEMM (4x16 micro-kernel, masked edges)
-│   ├── gemm_simd.cpp             # std::experimental::simd portable GEMM
-│   ├── gemm_parallel_simd.cpp    # OpenMP + AVX2 combined GEMM
-│   └── gemm_parallel_avx512.cpp  # OpenMP + AVX-512 combined GEMM
+│   ├── gemm.cpp                  # the seven tiled entry points (serial and OpenMP)
+│   ├── tile_driver.cpp           # argument check, serial and OpenMP tile loops
+│   ├── tile_kernel_scalar.cpp    # one output tile, scalar
+│   ├── tile_kernel_avx2.cpp      # one output tile, AVX2+FMA (4x8 micro-kernel)
+│   ├── tile_kernel_avx512.cpp    # one output tile, AVX-512 (4x16 micro-kernel, masked edges)
+│   └── tile_kernel_stdsimd.cpp   # one output tile, std::experimental::simd
 ├── tests/
 │   ├── test_utils.h              # assertion macros
 │   ├── test_tensor.cpp           # tensor tests (12 cases incl. alignment)
