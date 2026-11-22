@@ -1,18 +1,10 @@
 #include "gemm.h"
-
-#include <stdexcept>
+#include "tile_driver.h"
 
 namespace tile_runtime {
 
 void gemm_naive(const Tensor& A, const Tensor& B, Tensor& C) {
-    if (A.cols() != B.rows()) {
-        throw std::invalid_argument(
-            "gemm_naive: A.cols() != B.rows() — dimension mismatch");
-    }
-    if (C.rows() != A.rows() || C.cols() != B.cols()) {
-        throw std::invalid_argument(
-            "gemm_naive: C dimensions do not match (A.rows() x B.cols())");
-    }
+    detail::check_gemm_args("gemm_naive", A, B, C);
 
     const size_t M = A.rows();
     const size_t K = A.cols();

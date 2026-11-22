@@ -251,7 +251,7 @@ int main() {
         }
 
         // --- SIMD kernels (sweep block sizes) ---
-        if (cpu.avx2 && cpu.fma) {
+        if (tile_runtime::gemm_avx2_supported()) {
             for (size_t bs : block_sizes) {
                 auto avx = bench_tiled("avx2+fma", N, bs,
                                         tile_runtime::gemm_avx, warmup, trials);
@@ -260,7 +260,7 @@ int main() {
             }
         }
 
-        if (cpu.avx512f) {
+        if (tile_runtime::gemm_avx512_supported()) {
             for (size_t bs : block_sizes) {
                 auto avx512 = bench_tiled("avx-512", N, bs,
                                            tile_runtime::gemm_avx512, warmup, trials);
@@ -269,17 +269,17 @@ int main() {
             }
         }
 
-#ifdef TILE_HAS_STD_SIMD
-        for (size_t bs : block_sizes) {
-            auto simd = bench_tiled("std-simd", N, bs,
-                                     tile_runtime::gemm_simd, warmup, trials);
-            print_row(simd, naive.time_ms);
-            record(simd);
+        if (tile_runtime::gemm_simd_supported()) {
+            for (size_t bs : block_sizes) {
+                auto simd = bench_tiled("std-simd", N, bs,
+                                         tile_runtime::gemm_simd, warmup, trials);
+                print_row(simd, naive.time_ms);
+                record(simd);
+            }
         }
-#endif
 
         // --- Parallel + SIMD (AVX2, sweep block sizes) ---
-        if (cpu.avx2 && cpu.fma) {
+        if (tile_runtime::gemm_avx2_supported()) {
             for (size_t bs : block_sizes) {
                 for (int t : threads) {
                     auto par_simd = bench_parallel("parallel+simd", N, bs,
@@ -292,7 +292,7 @@ int main() {
         }
 
         // --- Parallel + AVX-512 (sweep block sizes) ---
-        if (cpu.avx512f) {
+        if (tile_runtime::gemm_avx512_supported()) {
             for (size_t bs : block_sizes) {
                 for (int t : threads) {
                     auto par_avx512 = bench_parallel("parallel+avx512", N, bs,

@@ -1,7 +1,6 @@
 #include "test_utils.h"
 #include "gemm.h"
 #include "tensor.h"
-#include "cpu_features.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -20,9 +19,7 @@ using tile_runtime::gemm_tiled;
 using tile_runtime::gemm_parallel;
 using tile_runtime::gemm_avx;
 using tile_runtime::gemm_avx512;
-#ifdef TILE_HAS_STD_SIMD
 using tile_runtime::gemm_simd;
-#endif
 using tile_runtime::gemm_parallel_simd;
 using tile_runtime::gemm_parallel_avx512;
 
@@ -39,7 +36,7 @@ struct KernelCase {
     Kernel run;
     bool uses_block_size;  // false for gemm_naive: one run per shape is enough
     bool parallel;         // true for the OpenMP kernels
-    bool supported;        // false when this CPU cannot run the kernel
+    bool supported;        // false when the CPU, operating system or build cannot run it
 };
 
 static void run_naive(const Tensor& A, const Tensor& B, Tensor& C, size_t /*block_size*/) {
@@ -48,20 +45,16 @@ static void run_naive(const Tensor& A, const Tensor& B, Tensor& C, size_t /*bloc
 
 static const std::vector<KernelCase>& all_kernels() {
     static const std::vector<KernelCase> kernels = [] {
-        const tile_runtime::CpuFeatures& cpu = tile_runtime::CpuFeatures::detect();
-        const bool avx2 = cpu.avx2 && cpu.fma;
-        // The AVX-512 sources are compiled with -mavx512vl as well as -mavx512f.
-        const bool avx512 = cpu.avx512f && cpu.avx512vl && cpu.fma;
+        const bool avx2   = tile_runtime::gemm_avx2_supported();
+        const bool avx512 = tile_runtime::gemm_avx512_supported();
+        const bool simd   = tile_runtime::gemm_simd_supported();
         return std::vector<KernelCase>{
             {"gemm_naive", run_naive, false, false, true},
             {"gemm_tiled", gemm_tiled, true, false, true},
             {"gemm_parallel", gemm_parallel, true, true, true},
             {"gemm_avx", gemm_avx, true, false, avx2},
             {"gemm_avx512", gemm_avx512, true, false, avx512},
-#ifdef TILE_HAS_STD_SIMD
-            // Compiled with -mavx2 -mfma, so it needs the same CPU as gemm_avx.
-            {"gemm_simd", gemm_simd, true, false, avx2},
-#endif
+            {"gemm_simd", gemm_simd, true, false, simd},
             {"gemm_parallel_simd", gemm_parallel_simd, true, true, avx2},
             {"gemm_parallel_avx512", gemm_parallel_avx512, true, true, avx512},
         };
@@ -74,7 +67,7 @@ static void print_kernels_under_test() {
     for (const KernelCase& kernel : all_kernels()) {
         std::cout << " " << kernel.name;
         if (!kernel.supported) {
-            std::cout << " (skipped: this CPU cannot run it)";
+            std::cout << " (not supported here: must throw std::runtime_error)";
         }
     }
     std::cout << std::endl;
@@ -163,12 +156,18 @@ static bool matches_reference(const KernelCase& kernel, size_t block_size,
     return true;
 }
 
-// Runs one kernel and checks the result. C starts at zero: the tiled and SIMD
-// kernels add into C instead of overwriting it, so any other starting value
-// would fail here for a reason these checks are not about.
+// An output tensor filled with NaN. Every kernel must overwrite C, so a
+// kernel that adds into C, or leaves an element unwritten, still has NaN
+// there, and every comparison in this file rejects NaN.
+static Tensor nan_filled(size_t rows, size_t cols) {
+    return Tensor(rows, cols, std::numeric_limits<float>::quiet_NaN());
+}
+
+// Runs one kernel and checks the result. C starts as NaN so every output
+// element must be overwritten to pass the comparison.
 static void check_kernel(const KernelCase& kernel, const Tensor& A, const Tensor& B,
                          const Reference& ref, size_t block_size) {
-    Tensor C(ref.M, ref.N);
+    Tensor C = nan_filled(ref.M, ref.N);
     kernel.run(A, B, C, block_size);
     matches_reference(kernel, block_size, ref, C);
 }
@@ -285,15 +284,15 @@ void test_hand_computed_products() {
             continue;
         }
         for (size_t block_size : block_sizes) {
-            Tensor C(2, 2);
+            Tensor C = nan_filled(2, 2);
             kernel.run(A2, B2, C, block_size);
             expect_values(kernel, block_size, C, C2);
 
-            Tensor D(3, 4);
+            Tensor D = nan_filled(3, 4);
             kernel.run(A3, B3, D, block_size);
             expect_values(kernel, block_size, D, C3);
 
-            Tensor E(1, 1);
+            Tensor E = nan_filled(1, 1);
             kernel.run(A1, B1, E, block_size);
             expect_values(kernel, block_size, E, C1);
         }
@@ -342,11 +341,11 @@ void test_identity_returns_the_input_exactly() {
                 continue;
             }
             for (size_t block_size : block_sizes) {
-                Tensor C(shape.rows, shape.cols);
+                Tensor C = nan_filled(shape.rows, shape.cols);
                 kernel.run(left, A, C, block_size);
                 expect_exact(kernel, block_size, "identity * A", C, A);
 
-                Tensor D(shape.rows, shape.cols);
+                Tensor D = nan_filled(shape.rows, shape.cols);
                 kernel.run(A, right, D, block_size);
                 expect_exact(kernel, block_size, "A * identity", D, A);
             }
@@ -424,12 +423,13 @@ void test_k_chunks_match_reference() {
     }
 }
 
-// Matrices with a zero dimension are legal inputs. With K = 0 the product is
-// the zero matrix. With M = 0 or N = 0 there is nothing to compute and the
-// kernel must return without dividing by a zero tile count.
+// Matrices with a zero dimension are legal inputs. With K = 0, C starts as
+// NaN and the zero tolerance requires every element to be overwritten with
+// exact zero, even across several tiles. With M = 0 or N = 0 there is nothing
+// to compute and the kernel must return without dividing by a zero tile count.
 void test_empty_shapes() {
     struct Shape { size_t M, K, N; };
-    const Shape shapes[] = {{3, 0, 5}, {0, 5, 3}, {3, 5, 0}, {0, 0, 0}};
+    const Shape shapes[] = {{3, 0, 5}, {0, 5, 3}, {3, 5, 0}, {0, 0, 0}, {9, 0, 33}};
     const std::vector<size_t> block_sizes = {1, 4};
 
     unsigned seed = 5000;
@@ -441,10 +441,16 @@ void test_empty_shapes() {
 
 // Records a failure unless the kernel rejects these shapes.
 static void expect_invalid_argument(const KernelCase& kernel, const char* what,
-                                    const Tensor& A, const Tensor& B, Tensor& C) {
+                                    const Tensor& A, const Tensor& B, Tensor& C,
+                                    size_t block_size) {
     try {
-        kernel.run(A, B, C, 16);
+        kernel.run(A, B, C, block_size);
     } catch (const std::invalid_argument&) {
+        return;
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument for "
+                  << what << ", got: " << e.what() << std::endl;
+        ++g_test_failures;
         return;
     }
     std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument for "
@@ -452,44 +458,263 @@ static void expect_invalid_argument(const KernelCase& kernel, const char* what,
     ++g_test_failures;
 }
 
+// Arguments must be checked before CPU support on every machine,
+// so these tests run even for kernels this machine cannot execute.
 void test_shape_mismatch_throws() {
     for (const KernelCase& kernel : all_kernels()) {
-        if (!kernel.supported) {
-            continue;
-        }
         {
             Tensor A(2, 3), B(4, 2), C(2, 2);
-            expect_invalid_argument(kernel, "A.cols() != B.rows()", A, B, C);
+            expect_invalid_argument(kernel, "A.cols() != B.rows()", A, B, C, 16);
         }
         {
             Tensor A(2, 3), B(3, 4), C(3, 4);
-            expect_invalid_argument(kernel, "C with the wrong number of rows", A, B, C);
+            expect_invalid_argument(kernel, "C with the wrong number of rows", A, B, C, 16);
         }
         {
             Tensor A(2, 3), B(3, 4), C(2, 5);
-            expect_invalid_argument(kernel, "C with the wrong number of columns", A, B, C);
+            expect_invalid_argument(kernel, "C with the wrong number of columns", A, B, C, 16);
         }
     }
 }
 
-// gemm_naive overwrites whatever C held before the call.
-void test_naive_overwrites_previous_output() {
-    Tensor A(3, 3);
-    A.randomize(10);
+// The product must be independent of the previous contents of C. A finite
+// starting value makes any unintended addition visible in the failure output.
+void test_every_kernel_overwrites_previous_output() {
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {3, 3, 3, 16}, {9, 17, 33, 4}, {37, 53, 71, 16}, {40, 19, 72, 8},
+    };
 
-    Tensor Z(3, 3);  // all zeros
+    const int failures_before = g_test_failures;
+    unsigned seed = 8000;
+    for (const Shape& shape : shapes) {
+        Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+        A.randomize(seed++);
+        B.randomize(seed++);
+        const Reference ref = reference_product(A, B);
 
-    Tensor C(3, 3, 999.0f);
-    gemm_naive(A, Z, C);
+        for (const KernelCase& kernel : all_kernels()) {
+            if (!kernel.supported) {
+                continue;
+            }
+            Tensor C(shape.M, shape.N, 999.0f);
+            kernel.run(A, B, C, shape.block_size);
+            matches_reference(kernel, shape.block_size, ref, C);
+            if (too_many_failures(failures_before)) {
+                return;
+            }
+        }
+    }
+}
 
-    for (size_t i = 0; i < 3; ++i)
-        for (size_t j = 0; j < 3; ++j)
-            ASSERT_NEAR(C.at(i, j), 0.0f);
+// C starts at zero on purpose. Only the contents of C change between calls,
+// so a kernel that adds into C reports a doubled value instead of NaN.
+void test_calling_twice_gives_the_same_result() {
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {3, 3, 3, 16}, {9, 17, 33, 4}, {37, 53, 71, 16}, {40, 19, 72, 8},
+    };
+
+    const int failures_before = g_test_failures;
+    unsigned seed = 9000;
+    for (const Shape& shape : shapes) {
+        Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+        A.randomize(seed++);
+        B.randomize(seed++);
+
+        for (const KernelCase& kernel : all_kernels()) {
+            if (!kernel.supported) {
+                continue;
+            }
+            Tensor C(shape.M, shape.N);
+            kernel.run(A, B, C, shape.block_size);
+            const Tensor first = C;
+            kernel.run(A, B, C, shape.block_size);
+            expect_exact(kernel, shape.block_size,
+                         "second call on the same C against the first call", C, first);
+            if (too_many_failures(failures_before)) {
+                return;
+            }
+        }
+    }
+}
+
+// Diagnostics must identify the entry point and both relevant shapes.
+static void expect_shape_message(const KernelCase& kernel, const Tensor& A,
+                                 const Tensor& B, Tensor& C,
+                                 const char* first, const char* second) {
+    std::string message = "no exception";
+    try {
+        kernel.run(A, B, C, 16);
+    } catch (const std::invalid_argument& error) {
+        message = error.what();
+        if (message.find(kernel.name) != std::string::npos &&
+            message.find(first) != std::string::npos &&
+            message.find(second) != std::string::npos) {
+            return;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument, got: "
+                  << e.what() << std::endl;
+        ++g_test_failures;
+        return;
+    }
+    std::cerr << "FAIL: " << kernel.name << "  unexpected diagnostic: "
+              << message << std::endl;
+    ++g_test_failures;
+}
+
+// Shape errors must give callers enough context to locate the bad arguments.
+void test_error_messages_name_the_kernel_and_the_shapes() {
+    for (const KernelCase& kernel : all_kernels()) {
+        Tensor A(2, 3), B(4, 2), C(2, 2);
+        expect_shape_message(kernel, A, B, C, "2x3", "4x2");
+        Tensor D(3, 4), E(3, 5);
+        expect_shape_message(kernel, A, D, E, "3x5", "2x4");
+    }
+}
+
+// Rejected output aliases must leave both input tensors untouched.
+void test_output_aliasing_an_input_throws() {
+    for (const KernelCase& kernel : all_kernels()) {
+        Tensor S(5, 5), T(5, 5);
+        S.randomize(10000);
+        T.randomize(10001);
+        const Tensor S_before = S;
+        const Tensor T_before = T;
+        expect_invalid_argument(kernel, "C is the same tensor as A", S, T, S, 16);
+        expect_exact(kernel, 16, "A after the rejected call", S, S_before);
+        expect_invalid_argument(kernel, "C is the same tensor as B", S, T, T, 16);
+        expect_exact(kernel, 16, "B after the rejected call", T, T_before);
+    }
+}
+
+// Sharing the read-only inputs is legal even though output aliases are not.
+void test_inputs_may_alias_each_other() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.supported) {
+            continue;
+        }
+        for (size_t block_size : {size_t(4), size_t(16)}) {
+            Tensor S(17, 17);
+            S.randomize(11000);
+            const Reference ref = reference_product(S, S);
+            Tensor C = nan_filled(17, 17);
+            kernel.run(S, S, C, block_size);
+            matches_reference(kernel, block_size, ref, C);
+        }
+    }
+}
+
+// Oversized blocks must still compute the single output tile without wrapping.
+void test_huge_block_size_matches_reference() {
+    const size_t max = std::numeric_limits<size_t>::max();
+    const std::vector<size_t> blocks = {max, max - 1, max / 2 + 1, size_t(1) << 20};
+    check_shape(37, 53, 71, blocks, 12000);
+    check_shape(9, 17, 33, blocks, 12002);
+    check_shape(2, 3, 2, blocks, 12004);
+}
+
+// Zero cannot advance tile traversal and must be rejected before computing.
+void test_zero_block_size_throws() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.uses_block_size) {
+            continue;
+        }
+        Tensor A(4, 3), B(3, 5);
+        Tensor C = nan_filled(4, 5);
+        expect_invalid_argument(kernel, "block_size == 0", A, B, C, 0);
+    }
+}
+
+// A kernel the machine cannot run must report it, not crash and not be skipped.
+void test_unsupported_kernels_throw_runtime_error() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (kernel.supported) {
+            continue;
+        }
+        Tensor A(4, 3), B(3, 5);
+        A.randomize(13000);
+        B.randomize(13001);
+        Tensor C(4, 5, 999.0f);
+        const Tensor C_before = C;
+        const auto expect_runtime_error = [&kernel](const Tensor& a, const Tensor& b,
+                                                    Tensor& c, const char* shape) {
+            std::string failure;
+            try {
+                kernel.run(a, b, c, 16);
+                failure = "no exception";
+            } catch (const std::runtime_error& e) {
+                if (std::string(e.what()).find(kernel.name) == std::string::npos) {
+                    failure = std::string("diagnostic does not name the kernel: ") + e.what();
+                }
+            } catch (const std::exception& e) {
+                failure = std::string("unexpected exception: ") + e.what();
+            } catch (...) {
+                failure = "unexpected exception type";
+            }
+            if (!failure.empty()) {
+                std::cerr << "FAIL: " << kernel.name << "  expected std::runtime_error for "
+                          << shape << ": " << failure << std::endl;
+                ++g_test_failures;
+            }
+        };
+        expect_runtime_error(A, B, C, "nonempty tensors");
+        expect_exact(kernel, 16, "C after the rejected call", C, C_before);
+
+        Tensor empty_A(0, 0), empty_B(0, 0), empty_C(0, 0);
+        expect_runtime_error(empty_A, empty_B, empty_C, "empty tensors");
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Parallel kernels
 // ---------------------------------------------------------------------------
+
+// Each pair executes the same tile kernel on the same tiles, so scheduling
+// must leave every output value exactly equal to the serial result.
+void test_parallel_kernels_match_their_serial_twin() {
+    struct KernelPair { Kernel serial, parallel; };
+    const KernelPair pairs[] = {
+        {gemm_tiled, gemm_parallel},
+        {gemm_avx, gemm_parallel_simd},
+        {gemm_avx512, gemm_parallel_avx512},
+    };
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {40, 19, 72, 8}, {37, 53, 71, 16}, {9, 17, 33, 4}, {129, 65, 130, 64},
+    };
+
+    const auto& kernels = all_kernels();
+    const auto find_kernel = [&kernels](Kernel run) {
+        return std::find_if(kernels.begin(), kernels.end(),
+                            [run](const KernelCase& kernel) { return kernel.run == run; });
+    };
+
+    unsigned seed = 7000;
+    for (const KernelPair& pair : pairs) {
+        const auto serial = find_kernel(pair.serial);
+        const auto parallel = find_kernel(pair.parallel);
+        ASSERT_TRUE(serial != kernels.end() && parallel != kernels.end());
+        if (serial == kernels.end() || parallel == kernels.end() ||
+            !serial->supported || !parallel->supported) {
+            continue;
+        }
+
+        const std::string what = std::string("against ") + serial->name;
+        for (const Shape& shape : shapes) {
+            Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+            A.randomize(seed++);
+            B.randomize(seed++);
+
+            Tensor serial_result = nan_filled(shape.M, shape.N);
+            Tensor parallel_result = nan_filled(shape.M, shape.N);
+            serial->run(A, B, serial_result, shape.block_size);
+            parallel->run(A, B, parallel_result, shape.block_size);
+            expect_exact(*parallel, shape.block_size, what.c_str(), parallel_result, serial_result);
+        }
+    }
+}
 
 #ifdef _OPENMP
 // Each output tile is computed by exactly one thread, so a parallel kernel
@@ -517,7 +742,7 @@ void test_parallel_kernels_ignore_thread_count() {
             Tensor with_one_thread(shape.M, shape.N);
             for (int threads : thread_counts) {
                 omp_set_num_threads(threads);
-                Tensor C(shape.M, shape.N);
+                Tensor C = nan_filled(shape.M, shape.N);
                 kernel.run(A, B, C, shape.block_size);
                 matches_reference(kernel, shape.block_size, ref, C);
 
@@ -552,10 +777,18 @@ int main() {
     RUN_TEST(test_k_chunks_match_reference);
     RUN_TEST(test_empty_shapes);
     RUN_TEST(test_shape_mismatch_throws);
-    RUN_TEST(test_naive_overwrites_previous_output);
+    RUN_TEST(test_every_kernel_overwrites_previous_output);
+    RUN_TEST(test_calling_twice_gives_the_same_result);
+    RUN_TEST(test_error_messages_name_the_kernel_and_the_shapes);
+    RUN_TEST(test_output_aliasing_an_input_throws);
+    RUN_TEST(test_inputs_may_alias_each_other);
+    RUN_TEST(test_huge_block_size_matches_reference);
+    RUN_TEST(test_zero_block_size_throws);
+    RUN_TEST(test_unsupported_kernels_throw_runtime_error);
 
-#ifdef _OPENMP
     std::cout << "test_gemm (parallel kernels):" << std::endl;
+    RUN_TEST(test_parallel_kernels_match_their_serial_twin);
+#ifdef _OPENMP
     RUN_TEST(test_parallel_kernels_ignore_thread_count);
 #endif
 

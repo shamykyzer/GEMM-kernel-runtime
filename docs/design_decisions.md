@@ -13,7 +13,8 @@ returned by `Tensor::data()` with manual `row * cols + col` indexing.
 All GEMM functions require the caller to pre-allocate `C` with correct
 dimensions.  Kernels validate dimensions at entry and throw `std::invalid_argument`
 on mismatch.  No implicit resizing — this keeps the API predictable and avoids
-hidden allocations in hot paths.
+hidden allocations in hot paths.  Every kernel overwrites `C` with `A * B`:
+whatever `C` held before the call is discarded, never added to.
 
 ## 3. Memory Layout
 

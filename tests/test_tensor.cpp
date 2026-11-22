@@ -2,8 +2,16 @@
 #include "tensor.h"
 
 #include <cstdint>
+#include <limits>
+#include <type_traits>
+#include <utility>
 
 using tile_runtime::Tensor;
+
+static_assert(std::is_nothrow_move_constructible<Tensor>::value, "Tensor moves must not throw");
+static_assert(std::is_nothrow_move_assignable<Tensor>::value, "Tensor moves must not throw");
+static_assert(std::is_copy_constructible<Tensor>::value, "Tensor stays copyable");
+static_assert(std::is_copy_assignable<Tensor>::value, "Tensor stays copyable");
 
 void test_default_construction() {
     Tensor t;
@@ -126,6 +134,41 @@ void test_aligned_allocation() {
     ASSERT_TRUE((odd_addr % 64) == 0);
 }
 
+// Wrapped element counts must not let the reported shape exceed storage.
+void test_size_overflow_throws() {
+    const size_t half = std::numeric_limits<size_t>::max() / 2 + 1;
+    ASSERT_THROWS(Tensor(half, 2), std::length_error);
+    ASSERT_THROWS(Tensor(2, half), std::length_error);
+    ASSERT_THROWS(Tensor(half, 2, 1.0f), std::length_error);
+    ASSERT_THROWS(Tensor(half + 1, 2), std::length_error);
+    Tensor t(std::numeric_limits<size_t>::max(), 0);
+    ASSERT_EQ(t.size(), size_t(0));
+}
+
+// A moved source must describe the empty storage it owns after the transfer.
+void test_move_leaves_source_empty() {
+    Tensor a(2, 3, 1.0f);
+    Tensor b(std::move(a));
+    ASSERT_EQ(b.rows(), size_t(2));
+    ASSERT_EQ(b.cols(), size_t(3));
+    ASSERT_EQ(b.size(), size_t(6));
+    ASSERT_NEAR(b.at(1, 2), 1.0f);
+    ASSERT_EQ(a.rows(), size_t(0));
+    ASSERT_EQ(a.cols(), size_t(0));
+    ASSERT_EQ(a.size(), size_t(0));
+
+    Tensor c(4, 4);
+    Tensor d(2, 3, 5.0f);
+    c = std::move(d);
+    ASSERT_EQ(c.rows(), size_t(2));
+    ASSERT_EQ(c.cols(), size_t(3));
+    ASSERT_EQ(c.size(), size_t(6));
+    ASSERT_NEAR(c.at(1, 2), 5.0f);
+    ASSERT_EQ(d.rows(), size_t(0));
+    ASSERT_EQ(d.cols(), size_t(0));
+    ASSERT_EQ(d.size(), size_t(0));
+}
+
 int main() {
     std::cout << "test_tensor:" << std::endl;
     RUN_TEST(test_default_construction);
@@ -140,5 +183,7 @@ int main() {
     RUN_TEST(test_copy_independence);
     RUN_TEST(test_data_pointer);
     RUN_TEST(test_aligned_allocation);
+    RUN_TEST(test_size_overflow_throws);
+    RUN_TEST(test_move_leaves_source_empty);
     TEST_SUMMARY("test_tensor");
 }

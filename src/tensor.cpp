@@ -1,17 +1,47 @@
 #include "tensor.h"
 
+#include <algorithm>
+#include <limits>
 #include <random>
 #include <sstream>
+#include <string>
+#include <utility>
 
 namespace tile_runtime {
+
+static size_t checked_size(size_t rows, size_t cols) {
+    // Test cols first: it avoids dividing by zero, and a zero dimension is legal.
+    if (cols != 0 && rows > std::numeric_limits<size_t>::max() / cols) {
+        throw std::length_error("Tensor: rows * cols overflows size_t (" +
+            std::to_string(rows) + " x " + std::to_string(cols) + ")");
+    }
+    return rows * cols;
+}
 
 Tensor::Tensor() : rows_(0), cols_(0) {}
 
 Tensor::Tensor(size_t rows, size_t cols)
-    : rows_(rows), cols_(cols), data_(rows * cols, 0.0f) {}
+    : rows_(rows), cols_(cols), data_(checked_size(rows, cols), 0.0f) {}
 
 Tensor::Tensor(size_t rows, size_t cols, float init_value)
-    : rows_(rows), cols_(cols), data_(rows * cols, init_value) {}
+    : rows_(rows), cols_(cols), data_(checked_size(rows, cols), init_value) {}
+
+Tensor::Tensor(Tensor&& other) noexcept
+    : rows_(other.rows_), cols_(other.cols_), data_(std::move(other.data_)) {
+    other.rows_ = 0;
+    other.cols_ = 0;
+    other.data_.clear();
+}
+
+Tensor& Tensor::operator=(Tensor&& other) noexcept {
+    rows_ = other.rows_;
+    cols_ = other.cols_;
+    data_ = std::move(other.data_);
+    other.rows_ = 0;
+    other.cols_ = 0;
+    other.data_.clear();
+    return *this;
+}
 
 void Tensor::bounds_check(size_t i, size_t j) const {
     if (i >= rows_ || j >= cols_) {
