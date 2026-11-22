@@ -11,8 +11,16 @@ namespace tile_runtime {
 class Tensor {
 public:
     Tensor();
+    // Throws std::length_error if rows * cols overflows.
     Tensor(size_t rows, size_t cols);
+    // Throws std::length_error if rows * cols overflows.
     Tensor(size_t rows, size_t cols, float init_value);
+
+    Tensor(const Tensor&) = default;
+    Tensor& operator=(const Tensor&) = default;
+    // The source is left 0 x 0 and empty so its shape still describes its storage.
+    Tensor(Tensor&& other) noexcept;
+    Tensor& operator=(Tensor&& other) noexcept;
 
     size_t rows() const { return rows_; }
     size_t cols() const { return cols_; }

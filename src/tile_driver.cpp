@@ -3,21 +3,45 @@
 #include "tile_driver.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 
 namespace tile_runtime {
 namespace detail {
 
+static std::string shape(const Tensor& tensor) {
+    return std::to_string(tensor.rows()) + "x" + std::to_string(tensor.cols());
+}
+
 void check_gemm_args(const char* kernel, const Tensor& A, const Tensor& B, const Tensor& C) {
+    // Compare objects: distinct empty tensors may have null data pointers, and
+    // distinct tensors own separate storage. A and B may be the same object.
+    if (&C == &A) {
+        throw std::invalid_argument(std::string(kernel) +
+            ": C is the same tensor as A (the output must not alias an input)");
+    }
+    if (&C == &B) {
+        throw std::invalid_argument(std::string(kernel) +
+            ": C is the same tensor as B (the output must not alias an input)");
+    }
     if (A.cols() != B.rows()) {
-        throw std::invalid_argument(
-            std::string(kernel) + ": A.cols() != B.rows() (dimension mismatch)");
+        throw std::invalid_argument(std::string(kernel) + ": A is " + shape(A) +
+            " but B is " + shape(B) + " (A.cols() must equal B.rows())");
     }
     if (C.rows() != A.rows() || C.cols() != B.cols()) {
-        throw std::invalid_argument(
-            std::string(kernel) + ": C dimensions do not match (A.rows() x B.cols())");
+        throw std::invalid_argument(std::string(kernel) + ": C is " + shape(C) +
+            " but A * B is " + std::to_string(A.rows()) + "x" + std::to_string(B.cols()) +
+            " (C must be A.rows() x B.cols())");
     }
+}
+
+void check_gemm_args(const char* kernel, const Tensor& A, const Tensor& B, const Tensor& C,
+                     std::size_t block_size) {
+    if (block_size == 0) {
+        throw std::invalid_argument(std::string(kernel) + ": block_size must be at least 1");
+    }
+    check_gemm_args(kernel, A, B, C);
 }
 
 // Zeroes one output tile: columns [jj, j_end) of rows [ii, i_end).
@@ -34,17 +58,24 @@ void run_tiles_serial(TileKernel kernel, const Tensor& A, const Tensor& B, Tenso
     const std::size_t K = A.cols();
     const std::size_t N = B.cols();
 
+    // Return before clamping: with every dimension 0 the clamp would give a
+    // block of 0. A block at or above max(M, K, N) already meant one tile and
+    // one k chunk, so clamping changes no result, and it keeps M + block - 1
+    // from wrapping for huge block sizes.
+    if (M == 0 || N == 0) return;
+    const std::size_t block = std::min(block_size, std::max({M, K, N}));
+
     const float* a = A.data();
     const float* b = B.data();
     float* c = C.data();
 
-    for (std::size_t ii = 0; ii < M; ii += block_size) {
-        const std::size_t i_end = std::min(ii + block_size, M);
-        for (std::size_t jj = 0; jj < N; jj += block_size) {
-            const std::size_t j_end = std::min(jj + block_size, N);
+    for (std::size_t ii = 0; ii < M; ii += block) {
+        const std::size_t i_end = std::min(ii + block, M);
+        for (std::size_t jj = 0; jj < N; jj += block) {
+            const std::size_t j_end = std::min(jj + block, N);
             // The tile kernels add into C, so zeroing makes the entry points overwrite it.
             zero_tile(c, N, ii, i_end, jj, j_end);
-            kernel(a, b, c, K, N, ii, i_end, jj, j_end, block_size);
+            kernel(a, b, c, K, N, ii, i_end, jj, j_end, block);
         }
     }
 }
@@ -54,27 +85,33 @@ void run_tiles_parallel(TileKernel kernel, const Tensor& A, const Tensor& B, Ten
     const std::size_t K = A.cols();
     const std::size_t N = B.cols();
 
+    // Early return and clamp: see run_tiles_serial.
+    if (M == 0 || N == 0) return;
+    const std::size_t block = std::min(block_size, std::max({M, K, N}));
+
     const float* a = A.data();
     const float* b = B.data();
     float* c = C.data();
 
     // Linearize the 2D tile grid into a single loop for MSVC compatibility.
     // MSVC's OpenMP doesn't support collapse() and requires signed loop vars.
-    const int tile_rows = static_cast<int>((M + block_size - 1) / block_size);
-    const int tile_cols = static_cast<int>((N + block_size - 1) / block_size);
-    const int num_tiles = tile_rows * tile_cols;
+    // Use 64 bits because int overflows past 2^31 tiles. The product cannot
+    // overflow: there are no more tiles than elements of C, which is in memory.
+    const std::int64_t tile_rows = static_cast<std::int64_t>((M + block - 1) / block);
+    const std::int64_t tile_cols = static_cast<std::int64_t>((N + block - 1) / block);
+    const std::int64_t num_tiles = tile_rows * tile_cols;
 
 #ifdef _OPENMP
     #pragma omp parallel for schedule(static)
 #endif
-    for (int tile_idx = 0; tile_idx < num_tiles; ++tile_idx) {
-        const std::size_t ii = static_cast<std::size_t>(tile_idx / tile_cols) * block_size;
-        const std::size_t jj = static_cast<std::size_t>(tile_idx % tile_cols) * block_size;
-        const std::size_t i_end = std::min(ii + block_size, M);
-        const std::size_t j_end = std::min(jj + block_size, N);
+    for (std::int64_t tile_idx = 0; tile_idx < num_tiles; ++tile_idx) {
+        const std::size_t ii = static_cast<std::size_t>(tile_idx / tile_cols) * block;
+        const std::size_t jj = static_cast<std::size_t>(tile_idx % tile_cols) * block;
+        const std::size_t i_end = std::min(ii + block, M);
+        const std::size_t j_end = std::min(jj + block, N);
 
         zero_tile(c, N, ii, i_end, jj, j_end);
-        kernel(a, b, c, K, N, ii, i_end, jj, j_end, block_size);
+        kernel(a, b, c, K, N, ii, i_end, jj, j_end, block);
     }
 }
 

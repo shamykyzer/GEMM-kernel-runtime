@@ -448,9 +448,10 @@ void test_empty_shapes() {
 
 // Records a failure unless the kernel rejects these shapes.
 static void expect_invalid_argument(const KernelCase& kernel, const char* what,
-                                    const Tensor& A, const Tensor& B, Tensor& C) {
+                                    const Tensor& A, const Tensor& B, Tensor& C,
+                                    size_t block_size) {
     try {
-        kernel.run(A, B, C, 16);
+        kernel.run(A, B, C, block_size);
     } catch (const std::invalid_argument&) {
         return;
     }
@@ -466,15 +467,15 @@ void test_shape_mismatch_throws() {
         }
         {
             Tensor A(2, 3), B(4, 2), C(2, 2);
-            expect_invalid_argument(kernel, "A.cols() != B.rows()", A, B, C);
+            expect_invalid_argument(kernel, "A.cols() != B.rows()", A, B, C, 16);
         }
         {
             Tensor A(2, 3), B(3, 4), C(3, 4);
-            expect_invalid_argument(kernel, "C with the wrong number of rows", A, B, C);
+            expect_invalid_argument(kernel, "C with the wrong number of rows", A, B, C, 16);
         }
         {
             Tensor A(2, 3), B(3, 4), C(2, 5);
-            expect_invalid_argument(kernel, "C with the wrong number of columns", A, B, C);
+            expect_invalid_argument(kernel, "C with the wrong number of columns", A, B, C, 16);
         }
     }
 }
@@ -538,6 +539,95 @@ void test_calling_twice_gives_the_same_result() {
                 return;
             }
         }
+    }
+}
+
+// Diagnostics must identify the entry point and both relevant shapes.
+static void expect_shape_message(const KernelCase& kernel, const Tensor& A,
+                                 const Tensor& B, Tensor& C,
+                                 const char* first, const char* second) {
+    std::string message = "no exception";
+    try {
+        kernel.run(A, B, C, 16);
+    } catch (const std::invalid_argument& error) {
+        message = error.what();
+        if (message.find(kernel.name) != std::string::npos &&
+            message.find(first) != std::string::npos &&
+            message.find(second) != std::string::npos) {
+            return;
+        }
+    }
+    std::cerr << "FAIL: " << kernel.name << "  unexpected diagnostic: "
+              << message << std::endl;
+    ++g_test_failures;
+}
+
+// Shape errors must give callers enough context to locate the bad arguments.
+void test_error_messages_name_the_kernel_and_the_shapes() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.supported) {
+            continue;
+        }
+        Tensor A(2, 3), B(4, 2), C(2, 2);
+        expect_shape_message(kernel, A, B, C, "2x3", "4x2");
+        Tensor D(3, 4), E(3, 5);
+        expect_shape_message(kernel, A, D, E, "3x5", "2x4");
+    }
+}
+
+// Rejected output aliases must leave both input tensors untouched.
+void test_output_aliasing_an_input_throws() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.supported) {
+            continue;
+        }
+        Tensor S(5, 5), T(5, 5);
+        S.randomize(10000);
+        T.randomize(10001);
+        const Tensor S_before = S;
+        const Tensor T_before = T;
+        expect_invalid_argument(kernel, "C is the same tensor as A", S, T, S, 16);
+        expect_exact(kernel, 16, "A after the rejected call", S, S_before);
+        expect_invalid_argument(kernel, "C is the same tensor as B", S, T, T, 16);
+        expect_exact(kernel, 16, "B after the rejected call", T, T_before);
+    }
+}
+
+// Sharing the read-only inputs is legal even though output aliases are not.
+void test_inputs_may_alias_each_other() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.supported) {
+            continue;
+        }
+        for (size_t block_size : {size_t(4), size_t(16)}) {
+            Tensor S(17, 17);
+            S.randomize(11000);
+            const Reference ref = reference_product(S, S);
+            Tensor C = nan_filled(17, 17);
+            kernel.run(S, S, C, block_size);
+            matches_reference(kernel, block_size, ref, C);
+        }
+    }
+}
+
+// Oversized blocks must still compute the single output tile without wrapping.
+void test_huge_block_size_matches_reference() {
+    const size_t max = std::numeric_limits<size_t>::max();
+    const std::vector<size_t> blocks = {max, max - 1, max / 2 + 1, size_t(1) << 20};
+    check_shape(37, 53, 71, blocks, 12000);
+    check_shape(9, 17, 33, blocks, 12002);
+    check_shape(2, 3, 2, blocks, 12004);
+}
+
+// Zero cannot advance tile traversal and must be rejected before computing.
+void test_zero_block_size_throws() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (!kernel.supported || !kernel.uses_block_size) {
+            continue;
+        }
+        Tensor A(4, 3), B(3, 5);
+        Tensor C = nan_filled(4, 5);
+        expect_invalid_argument(kernel, "block_size == 0", A, B, C, 0);
     }
 }
 
@@ -653,6 +743,11 @@ int main() {
     RUN_TEST(test_shape_mismatch_throws);
     RUN_TEST(test_every_kernel_overwrites_previous_output);
     RUN_TEST(test_calling_twice_gives_the_same_result);
+    RUN_TEST(test_error_messages_name_the_kernel_and_the_shapes);
+    RUN_TEST(test_output_aliasing_an_input_throws);
+    RUN_TEST(test_inputs_may_alias_each_other);
+    RUN_TEST(test_huge_block_size_matches_reference);
+    RUN_TEST(test_zero_block_size_throws);
 
     std::cout << "test_gemm (parallel kernels):" << std::endl;
     RUN_TEST(test_parallel_kernels_match_their_serial_twin);

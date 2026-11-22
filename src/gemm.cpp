@@ -16,38 +16,38 @@
 namespace tile_runtime {
 
 void gemm_tiled(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_tiled", A, B, C);
+    detail::check_gemm_args("gemm_tiled", A, B, C, block_size);
     detail::run_tiles_serial(detail::tile_kernel_scalar, A, B, C, block_size);
 }
 
 void gemm_parallel(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_parallel", A, B, C);
+    detail::check_gemm_args("gemm_parallel", A, B, C, block_size);
     detail::run_tiles_parallel(detail::tile_kernel_scalar, A, B, C, block_size);
 }
 
 void gemm_avx(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_avx", A, B, C);
+    detail::check_gemm_args("gemm_avx", A, B, C, block_size);
     detail::run_tiles_serial(detail::tile_kernel_avx2, A, B, C, block_size);
 }
 
 void gemm_parallel_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_parallel_simd", A, B, C);
+    detail::check_gemm_args("gemm_parallel_simd", A, B, C, block_size);
     detail::run_tiles_parallel(detail::tile_kernel_avx2, A, B, C, block_size);
 }
 
 void gemm_avx512(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_avx512", A, B, C);
+    detail::check_gemm_args("gemm_avx512", A, B, C, block_size);
     detail::run_tiles_serial(detail::tile_kernel_avx512, A, B, C, block_size);
 }
 
 void gemm_parallel_avx512(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_parallel_avx512", A, B, C);
+    detail::check_gemm_args("gemm_parallel_avx512", A, B, C, block_size);
     detail::run_tiles_parallel(detail::tile_kernel_avx512, A, B, C, block_size);
 }
 
 #ifdef TILE_HAS_STD_SIMD
 void gemm_simd(const Tensor& A, const Tensor& B, Tensor& C, size_t block_size) {
-    detail::check_gemm_args("gemm_simd", A, B, C);
+    detail::check_gemm_args("gemm_simd", A, B, C, block_size);
     detail::run_tiles_serial(detail::tile_kernel_stdsimd, A, B, C, block_size);
 }
 #endif

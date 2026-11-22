@@ -10,8 +10,13 @@ namespace tile_runtime {
 //
 // Every function below computes C = A * B and overwrites C: whatever C held
 // before the call is discarded, never added to. C must already have shape
-// A.rows() x B.cols(); no function resizes it, and a shape mismatch throws
-// std::invalid_argument.
+// A.rows() x B.cols(); no function resizes it.
+//
+// Every function throws std::invalid_argument, before it reads or writes any
+// element, when A.cols() != B.rows(), when C is not A.rows() x B.cols(), when
+// block_size is 0 (the tiled functions), or when C is the same Tensor object
+// as A or B. A and B may be the same object. A block_size larger than the
+// matrices is allowed and means a single tile.
 
 // Naive triple-loop GEMM.
 void gemm_naive(const Tensor& A, const Tensor& B, Tensor& C);

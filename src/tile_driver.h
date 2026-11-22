@@ -10,8 +10,15 @@
 namespace tile_runtime {
 namespace detail {
 
-// Throws std::invalid_argument unless A is M x K, B is K x N and C is M x N.
+// Throws std::invalid_argument if C is the same Tensor object as A or B, or
+// unless A is M x K, B is K x N and C is M x N.
 void check_gemm_args(const char* kernel, const Tensor& A, const Tensor& B, const Tensor& C);
+
+// The same checks, and block_size must be at least 1.
+void check_gemm_args(const char* kernel, const Tensor& A, const Tensor& B, const Tensor& C,
+                     std::size_t block_size);
+
+// Both drivers require check_gemm_args with block_size to have succeeded.
 
 // Zeroes each block_size x block_size output tile and then calls `kernel` on
 // it, row by row. The tile kernels add into C, so zeroing the tile first is
