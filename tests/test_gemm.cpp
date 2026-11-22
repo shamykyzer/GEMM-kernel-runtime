@@ -1,7 +1,6 @@
 #include "test_utils.h"
 #include "gemm.h"
 #include "tensor.h"
-#include "cpu_features.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -20,9 +19,7 @@ using tile_runtime::gemm_tiled;
 using tile_runtime::gemm_parallel;
 using tile_runtime::gemm_avx;
 using tile_runtime::gemm_avx512;
-#ifdef TILE_HAS_STD_SIMD
 using tile_runtime::gemm_simd;
-#endif
 using tile_runtime::gemm_parallel_simd;
 using tile_runtime::gemm_parallel_avx512;
 
@@ -39,7 +36,7 @@ struct KernelCase {
     Kernel run;
     bool uses_block_size;  // false for gemm_naive: one run per shape is enough
     bool parallel;         // true for the OpenMP kernels
-    bool supported;        // false when this CPU cannot run the kernel
+    bool supported;        // false when the CPU, operating system or build cannot run it
 };
 
 static void run_naive(const Tensor& A, const Tensor& B, Tensor& C, size_t /*block_size*/) {
@@ -48,20 +45,16 @@ static void run_naive(const Tensor& A, const Tensor& B, Tensor& C, size_t /*bloc
 
 static const std::vector<KernelCase>& all_kernels() {
     static const std::vector<KernelCase> kernels = [] {
-        const tile_runtime::CpuFeatures& cpu = tile_runtime::CpuFeatures::detect();
-        const bool avx2 = cpu.avx2 && cpu.fma;
-        // The AVX-512 sources are compiled with -mavx512vl as well as -mavx512f.
-        const bool avx512 = cpu.avx512f && cpu.avx512vl && cpu.fma;
+        const bool avx2   = tile_runtime::gemm_avx2_supported();
+        const bool avx512 = tile_runtime::gemm_avx512_supported();
+        const bool simd   = tile_runtime::gemm_simd_supported();
         return std::vector<KernelCase>{
             {"gemm_naive", run_naive, false, false, true},
             {"gemm_tiled", gemm_tiled, true, false, true},
             {"gemm_parallel", gemm_parallel, true, true, true},
             {"gemm_avx", gemm_avx, true, false, avx2},
             {"gemm_avx512", gemm_avx512, true, false, avx512},
-#ifdef TILE_HAS_STD_SIMD
-            // Compiled with -mavx2 -mfma, so it needs the same CPU as gemm_avx.
-            {"gemm_simd", gemm_simd, true, false, avx2},
-#endif
+            {"gemm_simd", gemm_simd, true, false, simd},
             {"gemm_parallel_simd", gemm_parallel_simd, true, true, avx2},
             {"gemm_parallel_avx512", gemm_parallel_avx512, true, true, avx512},
         };
@@ -74,7 +67,7 @@ static void print_kernels_under_test() {
     for (const KernelCase& kernel : all_kernels()) {
         std::cout << " " << kernel.name;
         if (!kernel.supported) {
-            std::cout << " (skipped: this CPU cannot run it)";
+            std::cout << " (not supported here: must throw std::runtime_error)";
         }
     }
     std::cout << std::endl;
@@ -454,17 +447,21 @@ static void expect_invalid_argument(const KernelCase& kernel, const char* what,
         kernel.run(A, B, C, block_size);
     } catch (const std::invalid_argument&) {
         return;
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument for "
+                  << what << ", got: " << e.what() << std::endl;
+        ++g_test_failures;
+        return;
     }
     std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument for "
               << what << std::endl;
     ++g_test_failures;
 }
 
+// Arguments must be checked before CPU support on every machine,
+// so these tests run even for kernels this machine cannot execute.
 void test_shape_mismatch_throws() {
     for (const KernelCase& kernel : all_kernels()) {
-        if (!kernel.supported) {
-            continue;
-        }
         {
             Tensor A(2, 3), B(4, 2), C(2, 2);
             expect_invalid_argument(kernel, "A.cols() != B.rows()", A, B, C, 16);
@@ -556,6 +553,11 @@ static void expect_shape_message(const KernelCase& kernel, const Tensor& A,
             message.find(second) != std::string::npos) {
             return;
         }
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL: " << kernel.name << "  expected std::invalid_argument, got: "
+                  << e.what() << std::endl;
+        ++g_test_failures;
+        return;
     }
     std::cerr << "FAIL: " << kernel.name << "  unexpected diagnostic: "
               << message << std::endl;
@@ -565,9 +567,6 @@ static void expect_shape_message(const KernelCase& kernel, const Tensor& A,
 // Shape errors must give callers enough context to locate the bad arguments.
 void test_error_messages_name_the_kernel_and_the_shapes() {
     for (const KernelCase& kernel : all_kernels()) {
-        if (!kernel.supported) {
-            continue;
-        }
         Tensor A(2, 3), B(4, 2), C(2, 2);
         expect_shape_message(kernel, A, B, C, "2x3", "4x2");
         Tensor D(3, 4), E(3, 5);
@@ -578,9 +577,6 @@ void test_error_messages_name_the_kernel_and_the_shapes() {
 // Rejected output aliases must leave both input tensors untouched.
 void test_output_aliasing_an_input_throws() {
     for (const KernelCase& kernel : all_kernels()) {
-        if (!kernel.supported) {
-            continue;
-        }
         Tensor S(5, 5), T(5, 5);
         S.randomize(10000);
         T.randomize(10001);
@@ -622,12 +618,52 @@ void test_huge_block_size_matches_reference() {
 // Zero cannot advance tile traversal and must be rejected before computing.
 void test_zero_block_size_throws() {
     for (const KernelCase& kernel : all_kernels()) {
-        if (!kernel.supported || !kernel.uses_block_size) {
+        if (!kernel.uses_block_size) {
             continue;
         }
         Tensor A(4, 3), B(3, 5);
         Tensor C = nan_filled(4, 5);
         expect_invalid_argument(kernel, "block_size == 0", A, B, C, 0);
+    }
+}
+
+// A kernel the machine cannot run must report it, not crash and not be skipped.
+void test_unsupported_kernels_throw_runtime_error() {
+    for (const KernelCase& kernel : all_kernels()) {
+        if (kernel.supported) {
+            continue;
+        }
+        Tensor A(4, 3), B(3, 5);
+        A.randomize(13000);
+        B.randomize(13001);
+        Tensor C(4, 5, 999.0f);
+        const Tensor C_before = C;
+        const auto expect_runtime_error = [&kernel](const Tensor& a, const Tensor& b,
+                                                    Tensor& c, const char* shape) {
+            std::string failure;
+            try {
+                kernel.run(a, b, c, 16);
+                failure = "no exception";
+            } catch (const std::runtime_error& e) {
+                if (std::string(e.what()).find(kernel.name) == std::string::npos) {
+                    failure = std::string("diagnostic does not name the kernel: ") + e.what();
+                }
+            } catch (const std::exception& e) {
+                failure = std::string("unexpected exception: ") + e.what();
+            } catch (...) {
+                failure = "unexpected exception type";
+            }
+            if (!failure.empty()) {
+                std::cerr << "FAIL: " << kernel.name << "  expected std::runtime_error for "
+                          << shape << ": " << failure << std::endl;
+                ++g_test_failures;
+            }
+        };
+        expect_runtime_error(A, B, C, "nonempty tensors");
+        expect_exact(kernel, 16, "C after the rejected call", C, C_before);
+
+        Tensor empty_A(0, 0), empty_B(0, 0), empty_C(0, 0);
+        expect_runtime_error(empty_A, empty_B, empty_C, "empty tensors");
     }
 }
 
@@ -748,6 +784,7 @@ int main() {
     RUN_TEST(test_inputs_may_alias_each_other);
     RUN_TEST(test_huge_block_size_matches_reference);
     RUN_TEST(test_zero_block_size_throws);
+    RUN_TEST(test_unsupported_kernels_throw_runtime_error);
 
     std::cout << "test_gemm (parallel kernels):" << std::endl;
     RUN_TEST(test_parallel_kernels_match_their_serial_twin);

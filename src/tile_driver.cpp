@@ -1,6 +1,7 @@
-// Shared GEMM shape checks and serial and OpenMP tile traversal.
+// Shared GEMM shape checks, CPU support guards, and serial and OpenMP tile traversal.
 // The GEMM entry points select the tile kernel and traversal mode.
 #include "tile_driver.h"
+#include "cpu_features.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -9,6 +10,56 @@
 
 namespace tile_runtime {
 namespace detail {
+
+// These sets cover what MSVC may emit under /arch:AVX2 and /arch:AVX512,
+// even when the intrinsics in a tile kernel use fewer instruction sets.
+bool avx2_kernel_supported() {
+    const CpuFeatures& f = CpuFeatures::detect();
+    return f.avx && f.avx2 && f.fma && f.bmi1 && f.bmi2;
+}
+
+bool avx512_kernel_supported() {
+    const CpuFeatures& f = CpuFeatures::detect();
+    return avx2_kernel_supported() && f.avx512f && f.avx512vl &&
+           f.avx512bw && f.avx512dq && f.avx512cd;
+}
+
+bool stdsimd_kernel_supported() {
+#ifdef TILE_HAS_STD_SIMD
+    return avx2_kernel_supported();
+#else
+    return false;
+#endif
+}
+
+TileKernel require_avx2_kernel(const char* kernel) {
+    if (avx2_kernel_supported()) {
+        return tile_kernel_avx2;
+    }
+    throw std::runtime_error(std::string(kernel) +
+        ": this CPU or operating system does not support AVX2, FMA, BMI1 and BMI2");
+}
+
+TileKernel require_avx512_kernel(const char* kernel) {
+    if (avx512_kernel_supported()) {
+        return tile_kernel_avx512;
+    }
+    throw std::runtime_error(std::string(kernel) +
+        ": this CPU or operating system does not support AVX-512 (F, VL, BW, DQ, CD) with AVX2, FMA, BMI1 and BMI2");
+}
+
+TileKernel require_stdsimd_kernel(const char* kernel) {
+#ifdef TILE_HAS_STD_SIMD
+    if (stdsimd_kernel_supported()) {
+        return tile_kernel_stdsimd;
+    }
+    throw std::runtime_error(std::string(kernel) +
+        ": this CPU or operating system does not support AVX2, FMA, BMI1 and BMI2");
+#else
+    throw std::runtime_error(std::string(kernel) +
+        ": the std::simd kernel is not part of this build (it is only built with GCC)");
+#endif
+}
 
 static std::string shape(const Tensor& tensor) {
     return std::to_string(tensor.rows()) + "x" + std::to_string(tensor.cols());

@@ -36,6 +36,7 @@ void tile_kernel_avx512(const float* a, const float* b, float* c,
                         std::size_t jj, std::size_t j_end,
                         std::size_t block_size);
 
+// Defined only in builds with TILE_HAS_STD_SIMD; reached through require_stdsimd_kernel.
 void tile_kernel_stdsimd(const float* a, const float* b, float* c,
                          std::size_t K, std::size_t N,
                          std::size_t ii, std::size_t i_end,

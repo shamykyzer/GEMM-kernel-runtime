@@ -1,4 +1,4 @@
-// Internal argument checks and tile traversal used by the GEMM entry points.
+// Internal argument checks, CPU support guards, and tile traversal for GEMM.
 // The drivers take a tile kernel so both traversal modes share the same arithmetic.
 #pragma once
 
@@ -9,6 +9,17 @@
 
 namespace tile_runtime {
 namespace detail {
+
+// True when this CPU, its operating system and this build can run the tile kernel.
+bool avx2_kernel_supported();
+bool avx512_kernel_supported();
+bool stdsimd_kernel_supported();
+
+// Returns the tile kernel, or throws std::runtime_error naming `kernel`
+// (the public entry point) and the instruction sets it needs.
+TileKernel require_avx2_kernel(const char* kernel);
+TileKernel require_avx512_kernel(const char* kernel);
+TileKernel require_stdsimd_kernel(const char* kernel);
 
 // Throws std::invalid_argument if C is the same Tensor object as A or B, or
 // unless A is M x K, B is K x N and C is M x N.

@@ -1,44 +1,24 @@
 #pragma once
 
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
-
 namespace tile_runtime {
 
+// What this process may use: a flag is true only when the CPU has the
+// instruction set and the operating system saves the registers it needs.
 struct CpuFeatures {
+    bool avx;
     bool avx2;
     bool fma;
+    bool bmi1;
+    bool bmi2;
     bool avx512f;
     bool avx512vl;
+    bool avx512bw;
+    bool avx512dq;
+    bool avx512cd;
 
-    static const CpuFeatures& detect() {
-        static const CpuFeatures features = query();
-        return features;
-    }
-
-private:
-    static CpuFeatures query() {
-        CpuFeatures f{};
-#if defined(__GNUC__) && !defined(__clang__)
-        __builtin_cpu_init();
-#endif
-#if defined(__GNUC__) || defined(__clang__)
-        f.avx2     = __builtin_cpu_supports("avx2");
-        f.fma      = __builtin_cpu_supports("fma");
-        f.avx512f  = __builtin_cpu_supports("avx512f");
-        f.avx512vl = __builtin_cpu_supports("avx512vl");
-#elif defined(_MSC_VER)
-        int info[4];
-        __cpuidex(info, 1, 0);
-        f.fma = (info[2] >> 12) & 1;
-        __cpuidex(info, 7, 0);
-        f.avx2     = (info[1] >> 5) & 1;
-        f.avx512f  = (info[1] >> 16) & 1;
-        f.avx512vl = (info[1] >> 31) & 1;
-#endif
-        return f;
-    }
+    // Examines the CPU on the first call and returns the cached result
+    // after that. Safe to call from several threads.
+    static const CpuFeatures& detect();
 };
 
 }  // namespace tile_runtime
