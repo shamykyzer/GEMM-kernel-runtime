@@ -20,6 +20,15 @@ void check_gemm_args(const char* kernel, const Tensor& A, const Tensor& B, const
     }
 }
 
+// Zeroes one output tile: columns [jj, j_end) of rows [ii, i_end).
+static void zero_tile(float* c, std::size_t N,
+                      std::size_t ii, std::size_t i_end,
+                      std::size_t jj, std::size_t j_end) {
+    for (std::size_t i = ii; i < i_end; ++i) {
+        std::fill(c + i * N + jj, c + i * N + j_end, 0.0f);
+    }
+}
+
 void run_tiles_serial(TileKernel kernel, const Tensor& A, const Tensor& B, Tensor& C, std::size_t block_size) {
     const std::size_t M = A.rows();
     const std::size_t K = A.cols();
@@ -33,6 +42,8 @@ void run_tiles_serial(TileKernel kernel, const Tensor& A, const Tensor& B, Tenso
         const std::size_t i_end = std::min(ii + block_size, M);
         for (std::size_t jj = 0; jj < N; jj += block_size) {
             const std::size_t j_end = std::min(jj + block_size, N);
+            // The tile kernels add into C, so zeroing makes the entry points overwrite it.
+            zero_tile(c, N, ii, i_end, jj, j_end);
             kernel(a, b, c, K, N, ii, i_end, jj, j_end, block_size);
         }
     }
@@ -62,6 +73,7 @@ void run_tiles_parallel(TileKernel kernel, const Tensor& A, const Tensor& B, Ten
         const std::size_t i_end = std::min(ii + block_size, M);
         const std::size_t j_end = std::min(jj + block_size, N);
 
+        zero_tile(c, N, ii, i_end, jj, j_end);
         kernel(a, b, c, K, N, ii, i_end, jj, j_end, block_size);
     }
 }

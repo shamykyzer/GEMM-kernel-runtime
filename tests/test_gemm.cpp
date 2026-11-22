@@ -163,12 +163,18 @@ static bool matches_reference(const KernelCase& kernel, size_t block_size,
     return true;
 }
 
-// Runs one kernel and checks the result. C starts at zero: the tiled and SIMD
-// kernels add into C instead of overwriting it, so any other starting value
-// would fail here for a reason these checks are not about.
+// An output tensor filled with NaN. Every kernel must overwrite C, so a
+// kernel that adds into C, or leaves an element unwritten, still has NaN
+// there, and every comparison in this file rejects NaN.
+static Tensor nan_filled(size_t rows, size_t cols) {
+    return Tensor(rows, cols, std::numeric_limits<float>::quiet_NaN());
+}
+
+// Runs one kernel and checks the result. C starts as NaN so every output
+// element must be overwritten to pass the comparison.
 static void check_kernel(const KernelCase& kernel, const Tensor& A, const Tensor& B,
                          const Reference& ref, size_t block_size) {
-    Tensor C(ref.M, ref.N);
+    Tensor C = nan_filled(ref.M, ref.N);
     kernel.run(A, B, C, block_size);
     matches_reference(kernel, block_size, ref, C);
 }
@@ -285,15 +291,15 @@ void test_hand_computed_products() {
             continue;
         }
         for (size_t block_size : block_sizes) {
-            Tensor C(2, 2);
+            Tensor C = nan_filled(2, 2);
             kernel.run(A2, B2, C, block_size);
             expect_values(kernel, block_size, C, C2);
 
-            Tensor D(3, 4);
+            Tensor D = nan_filled(3, 4);
             kernel.run(A3, B3, D, block_size);
             expect_values(kernel, block_size, D, C3);
 
-            Tensor E(1, 1);
+            Tensor E = nan_filled(1, 1);
             kernel.run(A1, B1, E, block_size);
             expect_values(kernel, block_size, E, C1);
         }
@@ -342,11 +348,11 @@ void test_identity_returns_the_input_exactly() {
                 continue;
             }
             for (size_t block_size : block_sizes) {
-                Tensor C(shape.rows, shape.cols);
+                Tensor C = nan_filled(shape.rows, shape.cols);
                 kernel.run(left, A, C, block_size);
                 expect_exact(kernel, block_size, "identity * A", C, A);
 
-                Tensor D(shape.rows, shape.cols);
+                Tensor D = nan_filled(shape.rows, shape.cols);
                 kernel.run(A, right, D, block_size);
                 expect_exact(kernel, block_size, "A * identity", D, A);
             }
@@ -424,12 +430,13 @@ void test_k_chunks_match_reference() {
     }
 }
 
-// Matrices with a zero dimension are legal inputs. With K = 0 the product is
-// the zero matrix. With M = 0 or N = 0 there is nothing to compute and the
-// kernel must return without dividing by a zero tile count.
+// Matrices with a zero dimension are legal inputs. With K = 0, C starts as
+// NaN and the zero tolerance requires every element to be overwritten with
+// exact zero, even across several tiles. With M = 0 or N = 0 there is nothing
+// to compute and the kernel must return without dividing by a zero tile count.
 void test_empty_shapes() {
     struct Shape { size_t M, K, N; };
-    const Shape shapes[] = {{3, 0, 5}, {0, 5, 3}, {3, 5, 0}, {0, 0, 0}};
+    const Shape shapes[] = {{3, 0, 5}, {0, 5, 3}, {3, 5, 0}, {0, 0, 0}, {9, 0, 33}};
     const std::vector<size_t> block_sizes = {1, 4};
 
     unsigned seed = 5000;
@@ -472,19 +479,66 @@ void test_shape_mismatch_throws() {
     }
 }
 
-// gemm_naive overwrites whatever C held before the call.
-void test_naive_overwrites_previous_output() {
-    Tensor A(3, 3);
-    A.randomize(10);
+// The product must be independent of the previous contents of C. A finite
+// starting value makes any unintended addition visible in the failure output.
+void test_every_kernel_overwrites_previous_output() {
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {3, 3, 3, 16}, {9, 17, 33, 4}, {37, 53, 71, 16}, {40, 19, 72, 8},
+    };
 
-    Tensor Z(3, 3);  // all zeros
+    const int failures_before = g_test_failures;
+    unsigned seed = 8000;
+    for (const Shape& shape : shapes) {
+        Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+        A.randomize(seed++);
+        B.randomize(seed++);
+        const Reference ref = reference_product(A, B);
 
-    Tensor C(3, 3, 999.0f);
-    gemm_naive(A, Z, C);
+        for (const KernelCase& kernel : all_kernels()) {
+            if (!kernel.supported) {
+                continue;
+            }
+            Tensor C(shape.M, shape.N, 999.0f);
+            kernel.run(A, B, C, shape.block_size);
+            matches_reference(kernel, shape.block_size, ref, C);
+            if (too_many_failures(failures_before)) {
+                return;
+            }
+        }
+    }
+}
 
-    for (size_t i = 0; i < 3; ++i)
-        for (size_t j = 0; j < 3; ++j)
-            ASSERT_NEAR(C.at(i, j), 0.0f);
+// C starts at zero on purpose. Only the contents of C change between calls,
+// so a kernel that adds into C reports a doubled value instead of NaN.
+void test_calling_twice_gives_the_same_result() {
+    struct Shape { size_t M, K, N, block_size; };
+    const Shape shapes[] = {
+        {3, 3, 3, 16}, {9, 17, 33, 4}, {37, 53, 71, 16}, {40, 19, 72, 8},
+    };
+
+    const int failures_before = g_test_failures;
+    unsigned seed = 9000;
+    for (const Shape& shape : shapes) {
+        Tensor A(shape.M, shape.K), B(shape.K, shape.N);
+        A.randomize(seed++);
+        B.randomize(seed++);
+
+        for (const KernelCase& kernel : all_kernels()) {
+            if (!kernel.supported) {
+                continue;
+            }
+            Tensor C(shape.M, shape.N);
+            kernel.run(A, B, C, shape.block_size);
+            const Tensor first = C;
+            kernel.run(A, B, C, shape.block_size);
+            expect_exact(kernel, shape.block_size,
+                         "second call on the same C against the first call", C, first);
+            if (too_many_failures(failures_before)) {
+                return;
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -527,7 +581,8 @@ void test_parallel_kernels_match_their_serial_twin() {
             A.randomize(seed++);
             B.randomize(seed++);
 
-            Tensor serial_result(shape.M, shape.N), parallel_result(shape.M, shape.N);
+            Tensor serial_result = nan_filled(shape.M, shape.N);
+            Tensor parallel_result = nan_filled(shape.M, shape.N);
             serial->run(A, B, serial_result, shape.block_size);
             parallel->run(A, B, parallel_result, shape.block_size);
             expect_exact(*parallel, shape.block_size, what.c_str(), parallel_result, serial_result);
@@ -561,7 +616,7 @@ void test_parallel_kernels_ignore_thread_count() {
             Tensor with_one_thread(shape.M, shape.N);
             for (int threads : thread_counts) {
                 omp_set_num_threads(threads);
-                Tensor C(shape.M, shape.N);
+                Tensor C = nan_filled(shape.M, shape.N);
                 kernel.run(A, B, C, shape.block_size);
                 matches_reference(kernel, shape.block_size, ref, C);
 
@@ -596,7 +651,8 @@ int main() {
     RUN_TEST(test_k_chunks_match_reference);
     RUN_TEST(test_empty_shapes);
     RUN_TEST(test_shape_mismatch_throws);
-    RUN_TEST(test_naive_overwrites_previous_output);
+    RUN_TEST(test_every_kernel_overwrites_previous_output);
+    RUN_TEST(test_calling_twice_gives_the_same_result);
 
     std::cout << "test_gemm (parallel kernels):" << std::endl;
     RUN_TEST(test_parallel_kernels_match_their_serial_twin);
